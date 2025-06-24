@@ -1,0 +1,5 @@
+{% for task in tasks %}
+    {% include 'projects/partials/task_item.html' %}
+{% empty %}
+    <li class="list-group-item">No tasks for this project yet.</li>
+{% endfor %}

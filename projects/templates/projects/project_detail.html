@@ -1,0 +1,92 @@
+{% extends 'projects/base.html' %}
+{% load project_extras %}
+
+{% block content %}
+    <div class="d-flex justify-content-between align-items-center">
+        <h1>{{ project.title }}</h1>
+        {% if project.owner == user %}
+            <a href="{% url 'edit-project' project.id %}" class="btn btn-secondary">Edit this project</a>
+            <a href="{% url 'manage-collaborators' project.id %}" class="btn btn-info">Manage Collaborators</a>
+        {% endif %}
+    </div>
+    <hr>
+
+    <p>{{ project.description|default:"No description provided." }}</p>
+    <a href="{% url 'projects-index' %}">Back to all projects</a>
+
+    <hr>
+
+    <div class="mt-4">
+        <h2>Tasks</h2>
+
+        {% if project.owner == user %}
+            <form hx-post="{% url 'add-task' project.id %}" hx-target="#task-list-container" hx-swap="innerHTML" class="d-flex gap-2 mb-3">
+                {% csrf_token %}
+                <input type="text" name="title" class="form-control" placeholder="What needs to be done?" required>
+                <button type="submit" class="btn btn-primary">Add</button>
+            </form>
+        {% endif %}
+
+        <ul class="list-group" id="task-list-container">
+            {% include 'projects/partials/task_list.html' %}
+        </ul>
+    </div>
+
+    <div class="mt-5">
+        <h2>Discussion</h2>
+        <hr>
+
+        <div class="card mb-4">
+            <div class="card-body">
+                <form   hx-post="{% url 'add-comment' project.id %}"
+                        hx-target="#comment-section"
+                        hx-swap="innerHTML"
+                        _="on htmx:afterRequest reset() me">
+                    {% csrf_token %}
+                    {{ comment_form.body }}  <button class="btn btn-primary mt-2" type="submit">Post Comment</button>
+                </form>
+            </div>
+        </div>
+
+
+        <div id="comment-section">
+            {% include 'projects/partials/comment_list.html' %}
+        </div>
+    </div>
+
+    <div class="mt-5">
+        <h2>Project Files</h2>
+        <hr>
+        <div class="card mb-4">
+            <div class="card-body">
+                <h5 class="card-title">Upload a New File</h5>
+                <form method="POST" action="{% url 'add-file' project.id %}" enctype="multipart/form-data">
+                    {% csrf_token %}
+                    {{ file_form.as_p }}
+                    <button type="submit" class="btn btn-primary mt-2">Upload File</button>
+                </form>
+            </div>
+        </div>
+
+        <ul class="list-group">
+        {% for file in project_files %}
+            <li class="list-group-item d-flex justify-content-between align-items-center">
+                <div>
+                    <a href="
+                            {% if file.file.name|lower|endswith:'.csv' %}
+                                {% url 'view-file' file.id %}
+                            {% else %}
+                                {{ file.file.url }}
+                            {% endif %}
+                            " target="_blank">{{ file.file.name|cut:"project_files/" }}
+                    </a>
+                    <p class="mb-0 text-muted"><small>{{ file.description }}</small></p>
+                </div>
+                <small>Uploaded on: {{ file.uploaded_at|date:"Y-m-d" }}</small>
+            </li>
+        {% empty %}
+            <li class="list-group-item">No files have been uploaded yet.</li>
+        {% endfor %}
+        </ul>
+    </div>
+{% endblock %}

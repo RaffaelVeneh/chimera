@@ -1,0 +1,14 @@
+{% extends 'projects/base.html' %}
+
+{% block content %}
+    <h1>Manage Collaborators for "{{ project.title }}"</h1>
+    <hr>
+
+    <div id="collaborator-management-section">
+        {% include 'projects/partials/collaborator_lists.html' %}
+    </div>
+
+    <div class="mt-4">
+        <a href="{% url 'project-detail' project.id %}" class="btn btn-secondary">Back to Project</a>
+    </div>
+{% endblock %}

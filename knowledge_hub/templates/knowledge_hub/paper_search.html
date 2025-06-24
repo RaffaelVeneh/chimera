@@ -1,0 +1,39 @@
+{% extends 'projects/base.html' %}
+
+{% block content %}
+    <h1>Scientific Paper Search</h1>
+    <p class="text-muted">Search our database of papers from arXiv.</p>
+
+    <form method="GET" action="{% url 'paper-search' %}" class="mb-4">
+        <div class="input-group">
+            <input type="text" name="q" class="form-control" placeholder="Search by keyword (e.g., 'language', 'model', 'transformer')..." value="{{ query }}">
+            <button class="btn btn-primary" type="submit">Search</button>
+        </div>
+    </form>
+
+    {% if query %}
+        <hr>
+        <h3>Results for "{{ query }}"</h3>
+        <p>{{ papers.count }} paper(s) found.</p>
+    {% endif %}
+
+    <div class="mt-4">
+    {% for paper in papers %}
+        <div class="card mb-3">
+            <div class="card-body">
+                <h5 class="card-title">{{ paper.title }}</h5>
+                <h6 class="card-subtitle mb-2 text-muted">By {{ paper.authors }}</h6>
+                <p class="card-text"><small>Published on: {{ paper.publication_date }}</small></p>
+                <p class="card-text">{{ paper.abstract|truncatewords:50 }}</p>
+            </div>
+        </div>
+    {% empty %}
+        {% if query %}
+            <p>No results found for your query.</p>
+        {% else %}
+            <p>Please enter a search term to begin.</p>
+        {% endif %}
+    {% endfor %}
+    </div>
+
+{% endblock %}

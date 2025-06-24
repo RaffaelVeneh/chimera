@@ -1,0 +1,27 @@
+{% extends 'projects/base.html' %}
+
+{% block content %}
+    <h1>Edit Project</h1>
+
+    <form method="POST">
+        {% csrf_token %}
+        {{ form.as_p }}
+        <button type="submit">Save Changes</button>
+    </form>
+    <hr>
+    {% if project.owner == user %}
+    <p>
+        <button type="button" class="btn btn-danger"
+                data-bs-toggle="modal"
+                data-bs-target="#modal"
+                hx-get="{% url 'delete-project' project.id %}"
+                hx-target="#dialog"
+                >
+            Delete this project
+        </button>
+    </p>
+    {% endif %}
+    <hr>
+    <a href="{% url 'project-detail' project.id %}">Cancel</a>
+
+{% endblock %}

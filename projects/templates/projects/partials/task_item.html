@@ -1,0 +1,13 @@
+<li class="list-group-item d-flex justify-content-between align-items-center">
+    <span>
+        <input class="form-check-input me-2" type="checkbox"
+               hx-post="{% url 'toggle-task' task.id %}"
+               hx-target="closest li"
+               hx-swap="outerHTML"
+               {% if task.is_completed %}checked{% endif %}>
+
+        <span class="{% if task.is_completed %}text-decoration-line-through{% endif %}">
+            {{ task.title }}
+        </span>
+    </span>
+</li>

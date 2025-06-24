@@ -1,0 +1,12 @@
+{% extends 'projects/base.html' %}
+
+{% block content %}
+    <h1>Create a New Project</h1>
+
+    <form method="POST">
+        {% csrf_token %}
+        {{ form.as_p }}
+        <button type="submit" class="btn btn-success">Create Project</button>
+        <a href="{% url 'projects-index' %}" class="btn btn-light">Cancel</a>
+    </form>
+{% endblock %}

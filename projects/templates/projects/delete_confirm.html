@@ -1,0 +1,17 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <title>Confirm Deletion</title>
+</head>
+<body>
+    <h1>Are you sure?</h1>
+    <p>You are about to permanently delete the project: <strong>{{ project.title }}</strong></p>
+    <p>This action cannot be undone.</p>
+
+    <form method="POST">
+        {% csrf_token %}
+        <button type="submit">Yes, Delete</button>
+        <a href="{% url 'project-detail' project.id %}">Cancel</a>
+    </form>
+</body>
+</html>

@@ -1,0 +1,18 @@
+{% for comment in comments %}
+    <div class="card mb-3">
+        <div class="card-body">
+            <p class="card-text">{{ comment.body }}</p>
+            <p class="card-subtitle text-muted text-end">
+                <small>
+                    Posted by <strong>{{ comment.author.username }}</strong> on {{ comment.created_at|date:"F d, Y, P" }}
+                </small>
+            </p>
+        </div>
+    </div>
+{% empty %}
+    <div class="card">
+        <div class="card-body">
+            No comments yet.
+        </div>
+    </div>
+{% endfor %}
