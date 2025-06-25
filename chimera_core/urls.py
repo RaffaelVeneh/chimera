@@ -16,11 +16,15 @@ Including another URLconf
 """
 from django.conf import settings
 from django.conf.urls.static import static
+
 from django.contrib import admin
 from django.urls import path, include
+from django.views.generic.base import RedirectView
 from projects import views as project_views
 
 urlpatterns = [
+    path('', RedirectView.as_view(url='/projects/', permanent=True), name='home'),
+    
     path('admin/', admin.site.urls),
     path('logout/', project_views.logout_view, name='logout'),
     path('projects/', include('projects.urls')),
