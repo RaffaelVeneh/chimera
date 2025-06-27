@@ -1,0 +1,96 @@
+{% extends 'projects/base.html' %}
+
+{% block content %}
+    <h1 class="mb-4">Welcome back, {{ user.username }}!</h1>
+
+    <div class="row">
+        <div class="col-md-8">
+            <div class="card mb-4">
+                <div class="card-header">Marked Tasks</div>
+                <ul class="list-group list-group-flush">
+                    {% for task in pinned_tasks %}
+                        <li class="list-group-item d-flex justify-content-between align-items-center">
+                            <div>
+                                <span class="{% if task.is_completed %}text-decoration-line-through text-muted{% endif %}">
+                                    <a href="{% url 'project-detail' task.project.id %}" class="text-decoration-none">{{ task.title }}</a>
+                                </span>
+                                <span class="text-muted small"> (in {{ task.project.title }})</span>
+                            </div>
+                            <button class="btn btn-sm btn-outline-secondary"
+                                    hx-post="{% url 'unpin-task' task.id %}"
+                                    hx-target="closest li"
+                                    hx-swap="outerHTML">
+                                Unpin
+                            </button>
+                        </li>
+                    {% empty %}
+                        <li class="list-group-item">You have not pinned any project tasks yet.</li>
+                    {% endfor %}
+                </ul>
+            </div>
+
+            <div class="card mb-4">
+                <div class="card-header">Tasks Marked For You</div>
+            </div>
+
+            
+            <div class="card mb-4">
+                <div class="card-header">Recent Activity</div>
+                <div class="list-group list-group-flush">
+                    {% for item in activity_list|slice:":10" %}
+                        <div class="list-group-item">
+                            {% if item.is_completed is not None %}
+                                <p class="mb-1">
+                                    <strong>{{ item.created_by.username }}</strong> added a new task to 
+                                    <a href="{% url 'project-detail' item.project.id %}">{{ item.project.title }}</a>:
+                                    <em>"{{ item.title }}"</em>
+                                </p>
+                                <small class="text-muted">{{ item.created_at|timesince }} ago</small>
+
+                            {% elif item.body %}
+                                <p class="mb-1">
+                                    <strong>{{ item.author.username }}</strong> commented on 
+                                    <a href="{% url 'project-detail' item.project.id %}">{{ item.project.title }}</a>:
+                                    <em>"{{ item.body|truncatechars:50 }}"</em>
+                                </p>
+                                <small class="text-muted">{{ item.created_at|timesince }} ago</small>
+
+                            {% elif item.file %}
+                                <p class="mb-1">
+                                    <strong>{{ item.uploaded_by.username }}</strong> uploaded a new file to 
+                                    <a href="{% url 'project-detail' item.project.id %}">{{ item.project.title }}</a>:
+                                    <em>{{ item.file.name|cut:"project_files/" }}</em>
+                                </p>
+                                <small class="text-muted">{{ item.uploaded_at|timesince }} ago</small>
+                            {% endif %}
+                        </div>
+                    {% empty %}
+                        <div class="list-group-item">No recent activity.</div>
+                    {% endfor %}
+                </div>
+            </div>
+
+            <div class="card mb-4">
+                <div class="card-header">My Projects</div>
+                <div class="list-group list-group-flush">
+                    {% for project in owned_projects %}
+                        <a href="{% url 'project-detail' project.id %}" class="list-group-item list-group-item-action">{{ project.title }}</a>
+                    {% empty %}
+                         <li class="list-group-item">You have not created any projects yet.</li>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-4">
+            <div class="card">
+                <div class="card-header">Account</div>
+                <div class="list-group list-group-flush">
+                    <a href="{% url 'account_change_password' %}" class="list-group-item list-group-item-action">Change Password</a>
+                    <a href="{% url 'account_email' %}" class="list-group-item list-group-item-action">Manage Email</a>
+                    <a href="#" class="list-group-item list-group-item-action disabled">My Profile (coming soon)</a>
+                </div>
+            </div>
+        </div>
+    </div>
+{% endblock %}

@@ -2,6 +2,7 @@
 {% load project_extras %}
 
 {% block content %}
+    <div hx-post="{% url 'mark-project-read' project.id %}" hx-trigger="load"></div>
     <div class="d-flex justify-content-between align-items-center">
         <h1>{{ project.title }}</h1>
         {% if project.owner == user %}
@@ -12,81 +13,122 @@
     <hr>
 
     <p>{{ project.description|default:"No description provided." }}</p>
-    <a href="{% url 'projects-index' %}">Back to all projects</a>
+
+    {% if role in 'owner,admin' %}
+        <div id="request-inbox-wrapper" class="mb-4"
+            hx-get="{% url 'request-inbox' project.id %}"
+            hx-trigger="load, refresh-inbox from:body"
+            hx-swap="innerHTML">
+            <p><em>Loading access requests...</em></p>
+        </div>
+    {% endif %}
+
+    <a href="{% url 'project-list' %}" class="btn btn-danger" >Back to all projects</a>
+    
+    {% if project.is_public and role is None %}
+    <div class="my-4 p-3 bg-light border rounded">
+        <p class="mb-2">You are viewing this public project as a guest.</p>
+        {% include 'projects/partials/request_access_button.html' %}
+    </div>
+    {% endif %}
 
     <hr>
 
     <div class="mt-4">
         <h2>Tasks</h2>
-
-        {% if project.owner == user %}
-            <form hx-post="{% url 'add-task' project.id %}" hx-target="#task-list-container" hx-swap="innerHTML" class="d-flex gap-2 mb-3">
+        {% if role in 'owner,admin,editor' %}
+            <form hx-post="{% url 'add-task' project.id %}" _="on htmx:afterRequest reset() me" class="d-flex gap-2 mb-3">
                 {% csrf_token %}
                 <input type="text" name="title" class="form-control" placeholder="What needs to be done?" required>
                 <button type="submit" class="btn btn-primary">Add</button>
             </form>
         {% endif %}
 
-        <ul class="list-group" id="task-list-container">
-            {% include 'projects/partials/task_list.html' %}
-        </ul>
-    </div>
-
-    <div class="mt-5">
-        <h2>Discussion</h2>
-        <hr>
-
-        <div class="card mb-4">
-            <div class="card-body">
-                <form   hx-post="{% url 'add-comment' project.id %}"
-                        hx-target="#comment-section"
-                        hx-swap="innerHTML"
-                        _="on htmx:afterRequest reset() me">
-                    {% csrf_token %}
-                    {{ comment_form.body }}  <button class="btn btn-primary mt-2" type="submit">Post Comment</button>
-                </form>
-            </div>
-        </div>
-
-
-        <div id="comment-section">
-            {% include 'projects/partials/comment_list.html' %}
+        <div class="list-group" id="task-list-wrapper"
+            hx-get="{% url 'task-list' project.id %}"
+            hx-trigger="load, refresh-lists from:body"
+            hx-swap="innerHTML">
+            <p class="text-center"><em>Loading tasks...</em></p>
         </div>
     </div>
 
     <div class="mt-5">
-        <h2>Project Files</h2>
+        <div class="d-flex justify-content-between align-items-center">
+            <h2>Project Files</h2>
+            <!-- 1. The "Upload File" button that controls the collapse -->
+            {% if role in 'owner,admin,editor' %}
+                <button class="btn btn-primary" type="button" data-bs-toggle="collapse" data-bs-target="#upload-form-collapse" aria-expanded="false" aria-controls="upload-form-collapse">
+                    Upload Files
+                </button>
+            {% endif %}
+        </div>
         <hr>
-        <div class="card mb-4">
-            <div class="card-body">
-                <h5 class="card-title">Upload a New File</h5>
-                <form method="POST" action="{% url 'add-file' project.id %}" enctype="multipart/form-data">
+
+        <!-- 2. The Collapsible form area -->
+        <div class="collapse mb-4" id="upload-form-collapse">
+            <div class="card card-body">
+                <form action="{% url 'add-file' project.id %}" class="dropzone" id="file-dropzone">
                     {% csrf_token %}
-                    {{ file_form.as_p }}
-                    <button type="submit" class="btn btn-primary mt-2">Upload File</button>
                 </form>
+                <button class="btn btn-secondary mt-3" onclick="location.reload()">Done</button>
             </div>
         </div>
 
+        <!-- 3. The File List (shows top 5, as before) -->
         <ul class="list-group">
-        {% for file in project_files %}
+        {% for file in project.files.all|slice:":5" %}
             <li class="list-group-item d-flex justify-content-between align-items-center">
                 <div>
-                    <a href="
-                            {% if file.file.name|lower|endswith:'.csv' %}
-                                {% url 'view-file' file.id %}
-                            {% else %}
-                                {{ file.file.url }}
-                            {% endif %}
-                            " target="_blank">{{ file.file.name|cut:"project_files/" }}
+                    <a href="{% if file.file.name|lower|endswith:'.csv' %}{% url 'view-file' file.id %}{% else %}{{ file.file.url }}{% endif %}" target="_blank">
+                        {{ file.file.name|cut:"project_files/" }}
                     </a>
                     <p class="mb-0 text-muted"><small>{{ file.description }}</small></p>
                 </div>
-                <small>Uploaded on: {{ file.uploaded_at|date:"Y-m-d" }}</small>
+                <small class="text-muted">Uploaded by {{ file.uploaded_by.username }} on {{ file.uploaded_at|date:"M. d, Y" }}</small>
             </li>
         {% empty %}
             <li class="list-group-item">No files have been uploaded yet.</li>
         {% endfor %}
         </ul>
+
+        <div class="d-grid mt-3">
+            <a href="{% url 'file-list' project.id %}" class="btn btn-outline-primary">View All {{ project.files.count }} Files...</a>
+        </div>
+    </div>
+
+    <div class="mt-5">
+        <h2>Discussion</h2>
+        <hr>
+        {% if role in 'owner,admin,editor' %}
+            <div class="card mb-4">
+                <div class="card-body">
+                    <form   hx-post="{% url 'add-comment' project.id %}"
+                            _="on htmx:afterRequest reset() me">
+                        {% csrf_token %}
+                        {{ comment_form.body }}
+                        <button class="btn btn-primary mt-2" type="submit">Post Comment</button>
+                    </form>
+                </div>
+            </div>
+        {% endif %}
+
+        <div id="comment-list-wrapper"
+            hx-get="{% url 'comment-list' project.id %}"
+            hx-trigger="load, every 30s, refresh-lists from:body"
+            hx-swap="innerHTML">
+            <p class="text-center"><em>Loading comments...</em></p>
+        </div>
     </div>
 {% endblock %}
+
+<script>
+    Dropzone.autoDiscover = false;
+
+    new Dropzone("#file-dropzone", {
+        paramName: "file",
+        maxFilesize: 20,
+        acceptedFiles: ".jpeg,.jpg,.png,.gif,.pdf,.csv,.txt,.zip",
+        addRemoveLinks: true,
+        dictDefaultMessage: "click here or drop files to upload",
+    });
+</script>

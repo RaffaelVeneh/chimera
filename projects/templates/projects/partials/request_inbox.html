@@ -1,0 +1,68 @@
+{% load project_extras %}
+{% with pending_requests=project.access_requests.all|filter_by_status:'pending' %}
+    {% if requests_page %}
+        <div class="card border-info">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <span>
+                    Access Requests
+                    <span class="badge bg-info rounded-pill">{{ requests_page.paginator.count }}</span>
+                </span>
+                <div class="dropdown">
+                    <button class="btn btn-sm btn-outline-secondary dropdown-toggle" type="button" data-bs-toggle="dropdown">
+                        Sort: {{ current_sort_name }}
+                    </button>
+                    <ul class="dropdown-menu">
+                        {% for sort_val, sort_name in valid_sorts.items %}
+                        <li><a class="dropdown-item {% if current_sort == sort_val %}active{% endif %}" href="#"
+                            hx-get="{% url 'request-inbox' project.id %}?sort={{ sort_val }}" hx-target="#request-inbox-wrapper" hx-swap="innerHTML">{{ sort_name }}</a></li>
+                        {% endfor %}
+                    </ul>
+                </div>
+            </div>
+            <ul class="list-group list-group-flush">
+                {% for request in requests_page %}
+                    <li class="list-group-item d-flex justify-content-between align-items-center">
+                        <div>
+                            <strong>{{ request.user.username }}</strong> requested access
+                            <small class="text-muted d-block">on {{ request.requested_at|date:"M. d, Y" }}</small>
+                        </div>
+                        <span class="d-flex gap-2">
+                            <button class="btn btn-sm btn-success" hx-post="{% url 'approve-request' request.id %}" hx-trigger="click" hx-target="#request-inbox-wrapper">Approve</button>
+                            <button class="btn btn-sm btn-danger" hx-post="{% url 'deny-request' request.id %}" hx-trigger="click" hx-target="#request-inbox-wrapper">Deny</button>
+                        </span>
+                    </li>
+                {% endfor %}
+            </ul>
+        </div>
+        {% if requests_page.has_other_pages %}
+            <div class="pt-3">
+                <nav aria-label="Request pagination">
+                    <ul class="pagination pagination-sm justify-content-center">
+                        {% if requests_page.has_previous %}
+                            <li class="page-item"><a class="page-link" href="#" hx-get="{% url 'request-inbox' project.id %}?sort={{ current_sort }}&page={{ requests_page.previous_page_number }}" hx-target="#request-inbox-wrapper" hx-swap="innerHTML">Previous</a></li>
+                        {% else %}
+                            <li class="page-item disabled"><a class="page-link" href="#">Previous</a></li>
+                        {% endif %}
+                        {% for i in requests_page.paginator.page_range %}
+                            <li class="page-item {% if requests_page.number == i %}active{% endif %}"><a class="page-link" href="#" hx-get="{% url 'request-inbox' project.id %}?sort={{ current_sort }}&page={{ i }}" hx-target="#request-inbox-wrapper" hx-swap="innerHTML">{{ i }}</a></li>
+                        {% endfor %}
+                        {% if requests_page.has_next %}
+                            <li class="page-item"><a class="page-link" href="#" hx-get="{% url 'request-inbox' project.id %}?sort={{ current_sort }}&page={{ requests_page.next_page_number }}" hx-target="#request-inbox-wrapper" hx-swap="innerHTML">Next</a></li>
+                        {% else %}
+                            <li class="page-item disabled"><a class="page-link" href="#">Next</a></li>
+                        {% endif %}
+                    </ul>
+                </nav>
+            </div>
+        {% endif %}
+    {% else %}
+        <div class="card border-info">
+            <div class="card-header">
+                <span>No Access Requests</span>
+            </div>
+            <div class="card-body">
+                <p class="mb-0">There are no pending access requests for this project.</p>
+            </div>
+        </div>
+    {% endif %}
+{% endwith %}

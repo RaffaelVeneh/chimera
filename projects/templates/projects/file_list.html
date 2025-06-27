@@ -1,0 +1,18 @@
+{% extends 'projects/base.html' %}
+
+{% block content %}
+    <nav aria-label="breadcrumb">
+        <ol class="breadcrumb">
+            <li class="breadcrumb-item"><a href="{% url 'project-list' %}">Projects</a></li>
+            <li class="breadcrumb-item"><a href="{% url 'project-detail' project.id %}">{{ project.title }}</a></li>
+            <li class="breadcrumb-item active" aria-current="page">Files</li>
+        </ol>
+    </nav>
+
+    <h1>Files for "{{ project.title }}"</h1>
+    <hr>
+
+    <div id="file-list-container">
+        {% include 'projects/partials/file_list_content.html' %}
+    </div>
+{% endblock %}

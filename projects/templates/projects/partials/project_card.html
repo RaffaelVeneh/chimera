@@ -1,0 +1,46 @@
+{% load project_extras %}
+
+<a href="{% url 'project-detail' project.id %}" class="list-group-item list-group-item-action d-flex justify-content-between align-items-center">
+    <div>
+       <strong>{{ project.title }}</strong>
+       {% if active_tab != 'owned' %}
+           <span class="text-muted ms-2">- Owned by {{ project.owner.username }}</span>
+       {% endif %}
+
+       {% if show_notifications %}
+           <div class="p-2" style="font-size: 0.8em;">
+                <span>Tasks: {{ project.unread_tasks_count|default:"0" }} new</span> |
+                <span>Comments: {{ project.unread_comments_count|default:"0" }} new</span> |
+                <span>Files: {{ project.unread_files_count|default:"0" }} new</span>
+                {% if project.owner == user %}
+                    | <span>Requests: {{ project.pending_requests_count|default:"0" }} new</span>
+                {% endif %}
+           </div>
+       {% endif %}
+    </div>
+
+    <span class="d-flex gap-2 align-items-center">
+        {% if show_notifications %}
+            {% if project.unread_tasks_count > 0 %}
+                <span class="badge bg-success rounded-pill" title="{{ project.unread_tasks_count }} new task(s)">{{ project.unread_tasks_count|truncate_badge }}</span>
+            {% endif %}
+            {% if project.unread_comments_count > 0 %}
+                <span class="badge bg-primary rounded-pill" title="{{ project.unread_comments_count }} new comment(s)">{{ project.unread_comments_count|truncate_badge }}</span>
+            {% endif %}
+            {% if project.unread_files_count > 0 %}
+                <span class="badge bg-warning text-dark rounded-pill" title="{{ project.unread_files_count }} new file(s)">{{ project.unread_files_count|truncate_badge }}</span>
+            {% endif %}
+            {% if project.owner == user and project.pending_requests_count > 0 %}
+                 <span class="badge bg-danger rounded-pill" title="{{ project.pending_requests_count }} access request(s)">{{ project.pending_requests_count|truncate_badge }}</span>
+            {% endif %}
+        {% endif %}
+
+        {% if active_tab == 'public' %}
+            {% if project.owner == user %}
+                <span class="badge bg-primary">My Project</span>
+            {% elif user in project.collaborators.all %}
+                <span class="badge bg-secondary">Team Project</span>
+            {% endif %}
+        {% endif %}
+    </span>
+</a>

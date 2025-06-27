@@ -1,0 +1,58 @@
+{% load tz project_extras %}
+<div class="card mb-3" id="comment-{{ comment.id }}">
+    <div class="card-body">
+        {% with author_role=comment.author|has_project_role:project %}
+            {% if author_role == 'owner' or author_role == 'admin' %}
+                <div class="mb-2">
+                    {% if author_role == 'owner' %}
+                        <span class="badge bg-warning text-dark">Owner</span>
+                    {% elif author_role == 'admin' %}
+                        <span class="badge bg-danger">Admin</span>
+                    {% endif %}
+                </div>
+            {% endif %}
+        {% endwith %}
+        <div class="d-flex justify-content-between">
+            <p class="card-text">{{ comment.body }}</p>
+            <div class="dropdown">
+                <button class="btn btn-sm btn-light" type="button" data-bs-toggle="dropdown" aria-expanded="false">&#8942;</button>
+                <ul class="dropdown-menu">
+                    {% if comment.author == user %}
+                    <li>
+                        <button class="dropdown-item"
+                                hx-get="{% url 'edit-comment' comment.id %}"
+                                hx-target="#comment-{{ comment.id }} .card-body" hx-swap="innerHTML">
+                            Edit
+                        </button>
+                    </li>
+                    {% endif %}
+                    
+                    {% if comment.author == user or role == 'owner' or role == 'admin' %}
+                    <li>
+                        <button class="dropdown-item text-danger"
+                                hx-get="{% url 'delete-comment' comment.id %}"
+                                hx-target="#dialog"
+                                data-bs-toggle="modal"
+                                data-bs-target="#modal">
+                            Delete
+                        </button>
+                    </li>
+                    {% endif %}
+                    
+                    <li><a class="dropdown-item" href="#">Report (coming soon)</a></li>
+                </ul>
+            </div>
+        </div>
+        <div>
+            <p class="card-subtitle text-muted text-end mt-2">
+                <small> 
+                    {% if comment.was_edited %}
+                        Edited by <strong>{{ comment.author.username }}</strong> on {{ comment.edited_at|localtime|date:"M. d, Y, P" }}
+                    {% else %}
+                        Posted by <strong>{{ comment.author.username }}</strong> on {{ comment.created_at|localtime|date:"M. d, Y, P" }}
+                    {% endif %}
+                </small>
+            </p>
+        </div>
+    </div>
+</div>

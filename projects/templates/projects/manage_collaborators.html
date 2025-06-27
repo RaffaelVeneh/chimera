@@ -1,10 +1,10 @@
 {% extends 'projects/base.html' %}
-
 {% block content %}
-    <h1>Manage Collaborators for "{{ project.title }}"</h1>
+    <h1>Manage Team for "{{ project.title }}"</h1>
+    <p class="text-muted">As the project owner, you can add, remove, and change roles for your team members.</p>
     <hr>
 
-    <div id="collaborator-management-section">
+    <div id="management-section">
         {% include 'projects/partials/collaborator_lists.html' %}
     </div>
 

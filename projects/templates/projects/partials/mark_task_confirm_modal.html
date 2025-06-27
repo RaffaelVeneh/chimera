@@ -1,0 +1,18 @@
+<div class="modal-content">
+    <div class="modal-header">
+        <h5 class="modal-title">Task Already Completed</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+    </div>
+    <div class="modal-body">
+        <p>The task "<strong>{{ task.title }}</strong>" is already marked as complete.</p>
+        <p>Are you sure you still want to mark it?</p>
+    </div>
+    <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+        <form hx-post="{% url 'mark-task-for-user' task.id %}" data-bs-dismiss="modal">
+             {% csrf_token %}
+             <input type="hidden" name="assignee" value="{{ assignee_id }}">
+             <button type="submit" class="btn btn-warning">Yes, Mark Anyway</button>
+        </form>
+    </div>
+</div>

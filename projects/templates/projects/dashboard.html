@@ -1,0 +1,81 @@
+{% extends 'projects/base.html' %}
+{% block content %}
+    <h1 class="mb-4">Welcome back, {{ user.username }}!</h1>
+    <div class="row">
+        <div class="col-md-8">
+            <div class="card mb-4">
+                <div class="card-header">My Personal TODOs</div>
+                <div class="list-group-item">Coming soon...</div>
+            </div>
+            
+            <div class="card mb-4" id="assignments-card" hx-get="{% url 'dashboard-assignments' %}" hx-trigger="load">
+                <div class="list-group-item"><em>Loading assignments...</em></div>
+            </div>
+
+            <div class="card mb-4" id="pinned-tasks-card" hx-get="{% url 'dashboard-pinned-tasks' %}" hx-trigger="load">
+                <div class="list-group-item"><em>Loading pinned tasks...</em></div>
+            </div>
+
+            <div class="card mb-4">
+                <div class="card-header">Recent Activity</div>
+                <div class="list-group list-group-flush">
+                    {% for item in activity_list|slice:":10" %}
+                        <div class="list-group-item">
+                            {% if item.is_completed is not None %}
+                                <p class="mb-1">
+                                    <strong>{{ item.created_by.username }}</strong> added a new task to 
+                                    <a href="{% url 'project-detail' item.project.id %}">{{ item.project.title }}</a>:
+                                    <em>"{{ item.title }}"</em>
+                                </p>
+                                <small class="text-muted">{{ item.created_at|timesince }} ago</small>
+
+                            {% elif item.body %}
+                                <p class="mb-1">
+                                    <strong>{{ item.author.username }}</strong> commented on 
+                                    <a href="{% url 'project-detail' item.project.id %}">{{ item.project.title }}</a>:
+                                    <em>"{{ item.body|truncatechars:50 }}"</em>
+                                </p>
+                                <small class="text-muted">{{ item.created_at|timesince }} ago</small>
+
+                            {% elif item.file %}
+                                <p class="mb-1">
+                                    <strong>{{ item.uploaded_by.username }}</strong> uploaded a new file to 
+                                    <a href="{% url 'project-detail' item.project.id %}">{{ item.project.title }}</a>:
+                                    <em>{{ item.file.name|cut:"project_files/" }}</em>
+                                </p>
+                                <small class="text-muted">{{ item.uploaded_at|timesince }} ago</small>
+                            {% endif %}
+                        </div>
+                    {% empty %}
+                        <div class="list-group-item">No recent activity.</div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+
+        
+
+        <div class="col-md-4">
+            <div class="card mb-4">
+                <div class="card-header">My Projects</div>
+                <div class="list-group list-group-flush">
+                    {% for project in owned_projects|slice:":5" %}
+                        <a href="{% url 'project-detail' project.id %}" class="list-group-item list-group-item-action">{{ project.title }}</a>
+                    {% endfor %}
+                    {% if owned_projects.count > 5 %}
+                        <a href="{% url 'project-list' %}?tab=owned" class="list-group-item list-group-item-action text-center text-primary">View All...</a>
+                    {% endif %}
+                </div>
+            </div>
+            
+            <div class="card">
+                <div class="card-header">Account</div>
+                <div class="list-group list-group-flush">
+                    <a href="{% url 'account_change_password' %}" class="list-group-item list-group-item-action">Change Password</a>
+                    <a href="{% url 'account_email' %}" class="list-group-item list-group-item-action">Manage Email</a>
+                    <a href="#" class="list-group-item list-group-item-action disabled">My Profile (coming soon)</a>
+                </div>
+            </div>
+        </div>
+    </div>
+{% endblock %}

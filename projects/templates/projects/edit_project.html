@@ -1,12 +1,12 @@
 {% extends 'projects/base.html' %}
 
-{% block content %}
+{% load crispy_forms_tags %} {% block content %}
     <h1>Edit Project</h1>
 
     <form method="POST">
         {% csrf_token %}
-        {{ form.as_p }}
-        <button type="submit">Save Changes</button>
+        {{ form|crispy }}
+        <button class="btn btn-success" type="submit">Save Changes</button>
     </form>
     <hr>
     {% if project.owner == user %}
@@ -19,9 +19,7 @@
                 >
             Delete this project
         </button>
+        <a class="btn btn-light" href="{% url 'project-detail' project.id %}">Cancel</a>
     </p>
     {% endif %}
-    <hr>
-    <a href="{% url 'project-detail' project.id %}">Cancel</a>
-
 {% endblock %}

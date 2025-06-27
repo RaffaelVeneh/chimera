@@ -1,0 +1,24 @@
+<div hx-trigger="refresh-file-list from:body" hx-get="{% url 'file-list' project.id %}" hx-target="this">
+    <ul class="list-group">
+        {% for file in files_page %}
+        <li class="list-group-item d-flex justify-content-between align-items-center">
+            <div>
+                <a href="{{ file.file.url }}" target="_blank">{{ file.file.name|cut:"project_files/" }}</a>
+                <p class="mb-0 text-muted"><small>{{ file.description }}</small></p>
+                <p class="mb-0 text-muted"><small>Uploaded by {{ file.uploaded_by.username }} on {{ file.uploaded_at|date:"M. d, Y" }}</small></p>
+            </div>
+            {% if file.uploaded_by == user or role in 'owner,admin' %}
+                <button class="btn btn-sm btn-outline-danger"
+                        hx-get="{% url 'delete-file' file.id %}"
+                        hx-target="#dialog"
+                        data-bs-toggle="modal"
+                        data-bs-target="#modal">
+                    &times;
+                </button>
+            {% endif %}
+        </li>
+        {% empty %}
+        <li class="list-group-item">No files have been uploaded yet.</li>
+        {% endfor %}
+    </ul>
+</div>

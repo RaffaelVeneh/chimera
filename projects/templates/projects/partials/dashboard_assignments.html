@@ -1,0 +1,15 @@
+<div class="card-header">Tasks Marked For You</div>
+<ul class="list-group list-group-flush">
+    {% for assignment in assignments_for_me %}
+        <li class="list-group-item d-flex justify-content-between align-items-center">
+            <div>
+                <span class="{% if assignment.task.is_completed %}text-decoration-line-through text-muted{% endif %}"><a href="{% url 'project-detail' assignment.task.project.id %}">{{ assignment.task.title }}</a></span>
+                <span class="text-muted small"> (in {{ assignment.task.project.title }})</span>
+                <small class="d-block text-muted">Marked by {{ assignment.assigner.username }}</small>
+            </div>
+            <button class="btn btn-sm btn-outline-secondary" hx-post="{% url 'dismiss-assignment' assignment.id %}" hx-target="#assignments-card" hx-swap="innerHTML">Dismiss</button>
+        </li>
+    {% empty %}
+        <li class="list-group-item">No one has marked any tasks for you yet.</li>
+    {% endfor %}
+</ul>

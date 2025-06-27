@@ -1,0 +1,8 @@
+<form hx-post="{% url 'toggle-mark-task' task.id %}" hx-target="this" hx-swap="outerHTML">
+    <button class="btn btn-sm btn-outline-info"
+            hx-get="{% url 'get-mark-task-form' task.id %}"
+            hx-target="#mark-task-{{ task.id }}"
+            hx-swap="outerHTML">
+        Mark Task...
+    </button>
+</form>

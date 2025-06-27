@@ -1,17 +1,15 @@
 from django import forms
+from django.contrib.auth.models import User
 from .models import Project, Task, Comment, ProjectFile
 
 class ProjectForm(forms.ModelForm):
     class Meta:
         model = Project
-        # We only want the user to fill out these two fields
-        fields = ['title', 'description']
-        # We don't include 'owner' because we'll set that automatically
+        fields = ['title', 'description', 'is_public']
         
 class TaskForm(forms.ModelForm):
     class Meta:
         model = Task
-        # We only need the user to provide a title
         fields = ['title']
         widgets = {
             'title': forms.TextInput(attrs={'placeholder': 'Add a new task...'}),

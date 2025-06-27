@@ -1,0 +1,17 @@
+<form hx-post="{% url 'mark-task-for-user' task.id %}" hx-target="#mark-task-{{ task.id }}" hx-swap="outerHTML">
+    {% csrf_token %}
+    <div class="input-group input-group-sm">
+        <select name="assignee" class="form-select">
+            <option value="{{ user.id }}">Mark for Myself</option>
+            <option value="all">Mark for All Members</option>
+            <optgroup label="Specific Members">
+            {% for member in project_members %}
+                {% if member != user %}
+                    <option value="{{ member.id }}">{{ member.username }}</option>
+                {% endif %}
+            {% endfor %}
+            </optgroup>
+        </select>
+        <button type="submit" class="btn btn-info">Mark</button>
+    </div>
+</form>

@@ -1,9 +1,11 @@
 from django.urls import path
 from django.contrib.auth import views as auth_views
+from django.views.generic import TemplateView
 from . import views
+from projects import views as project_views
 
 urlpatterns = [
-    path('', views.index, name='projects-index'),
+    path('dashboard/', project_views.dashboard, name='dashboard'),
     path('new/', views.create_project, name='create-project'),
     path('<int:project_id>/', views.project_detail, name='project-detail'),
     path('<int:project_id>/edit/', views.edit_project, name='edit-project'),
@@ -14,7 +16,32 @@ urlpatterns = [
     path('<int:project_id>/add-comment/', views.add_comment, name='add-comment'),
     path('<int:project_id>/manage/', views.manage_collaborators, name='manage-collaborators'),
     path('<int:project_id>/add-collaborator/<int:user_id>/', views.add_collaborator, name='add-collaborator'),
+    path('memberships/<int:membership_id>/remove/', views.remove_membership, name='remove-membership'),
+    path('memberships/<int:membership_id>/change-role/', views.change_role, name='change-role'),
     path('<int:project_id>/remove-collaborator/<int:user_id>/', views.remove_collaborator, name='remove-collaborator'),
     path('<int:project_id>/add-file/', views.add_file, name='add-file'),
     path('files/<int:file_id>/view/', views.view_file, name='view-file'),
+    path('<int:project_id>/request-access/', views.request_access, name='request-access'),
+    path('requests/<int:request_id>/cancel/', views.cancel_access_request, name='cancel-request'),
+    path('requests/<int:request_id>/approve/', views.approve_request, name='approve-request'),
+    path('requests/<int:request_id>/deny/', views.deny_request, name='deny-request'),
+    path('<int:project_id>/tasks/', views.task_list, name='task-list'),
+    path('<int:project_id>/comments/', views.comment_list, name='comment-list'),
+    path('<int:project_id>/mark-read/', views.mark_project_read, name='mark-project-read'),
+    path('tasks/<int:task_id>/delete/', views.delete_task, name='delete-task'),
+    path('tasks/<int:task_id>/edit/', views.edit_task, name='edit-task'),
+    path('comments/<int:comment_id>/edit/', views.edit_comment, name='edit-comment'),
+    path('comments/<int:comment_id>/delete/', views.delete_comment, name='delete-comment'),
+    path('<int:project_id>/requests/', views.request_inbox, name='request-inbox'),
+    path('<int:project_id>/files/', views.file_list, name='file-list'),
+    path('files/<int:file_id>/delete/', views.delete_file, name='delete-file'),
+    path('accounts/logout/modal/', TemplateView.as_view(template_name="account/logout_modal.html"), name='logout-modal'),
+    path('tasks/<int:task_id>/get-mark-form/', views.get_mark_task_form, name='get-mark-task-form'),
+    path('tasks/<int:task_id>/mark-for-user/', views.mark_task_for_user, name='mark-task-for-user'),
+    path('tasks/<int:task_id>/mark/confirm/', views.confirm_mark_task, name='confirm-mark-task'),
+    path('tasks/<int:task_id>/unpin/', views.unpin_task, name='unpin-task'),
+    path('tasks/<int:task_id>/pin/', views.toggle_pin_task, name='toggle-pin-task'),
+    path('assignments/<int:assignment_id>/dismiss/', views.dismiss_assignment, name='dismiss-assignment'),
+    path('dashboard/pinned-tasks/', views.dashboard_pinned_tasks, name='dashboard-pinned-tasks'),
+    path('dashboard/assignments/', views.dashboard_assignments, name='dashboard-assignments'),
 ]

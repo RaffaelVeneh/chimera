@@ -1,0 +1,37 @@
+{% for task in tasks_page %}
+    {% include 'projects/partials/task_item.html' with task=task project=project role=role %}
+{% empty %}
+    <li class="list-group-item">No tasks for this project yet.</li>
+{% endfor %}
+
+{% if tasks_page.has_other_pages %}
+    <div class="pt-3">
+        <nav aria-label="Task pagination">
+            <ul class="pagination justify-content-center">
+                {% if tasks_page.has_previous %}
+                    <li class="page-item"><a class="page-link" href="#" 
+                        hx-get="{% url 'task-list' project.id %}?sort={{ current_sort }}&page={{ tasks_page.previous_page_number }}&search={{ search_query }}" 
+                        hx-target="#task-list-content" hx-swap="innerHTML">Previous</a></li>
+                {% else %}
+                    <li class="page-item disabled"><a class="page-link" href="#">Previous</a></li>
+                {% endif %}
+
+                {% for i in tasks_page.paginator.page_range %}
+                    <li class="page-item {% if tasks_page.number == i %}active{% endif %}">
+                        <a class="page-link" href="#" 
+                        hx-get="{% url 'task-list' project.id %}?sort={{ current_sort }}&page={{ i }}&search={{ search_query }}" 
+                        hx-target="#task-list-content" hx-swap="innerHTML">{{ i }}</a>
+                    </li>
+                {% endfor %}
+
+                {% if tasks_page.has_next %}
+                    <li class="page-item"><a class="page-link" href="#" 
+                        hx-get="{% url 'task-list' project.id %}?sort={{ current_sort }}&page={{ tasks_page.next_page_number }}&search={{ search_query }}" 
+                        hx-target="#task-list-content" hx-swap="innerHTML">Next</a></li>
+                {% else %}
+                    <li class="page-item disabled"><a class="page-link" href="#">Next</a></li>
+                {% endif %}
+            </ul>
+        </nav>
+    </div>
+{% endif %}

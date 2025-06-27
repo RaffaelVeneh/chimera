@@ -1,0 +1,15 @@
+{% if existing_request and existing_request.status == 'pending' %}
+    <form   hx-post="{% url 'cancel-request' existing_request.id %}"
+            hx-target="this"
+            hx-swap="outerHTML">
+        {% csrf_token %}
+        <button type="submit" class="btn btn-warning">Cancel Access Request</button>
+    </form>
+{% else %}
+    <form   hx-post="{% url 'request-access' project.id %}"
+            hx-target="this"
+            hx-swap="outerHTML">
+        {% csrf_token %}
+        <button type="submit" class="btn btn-info">Request Editor Access</button>
+    </form>
+{% endif %}

@@ -1,0 +1,22 @@
+{% extends 'projects/base.html' %}
+
+{% block content %}
+    <div class="text-center py-5">
+        <h1 class="display-1">🚫</h1>
+        <h2 class="display-4">Access Denied (403)</h2>
+
+        {% if project %}
+            <p class="lead mt-4">
+                The project "<strong>{{ project.title }}</strong>" is private and you do not have permission to view it.
+            </p>
+            <hr class="my-4">
+            {% include 'projects/partials/request_access_button.html' %}
+        {% else %}
+            <p class="lead mt-4">
+                Oops! It looks like you don't have the necessary permissions to view this page.
+            </p>
+            <hr class="my-4">
+            <a class="btn btn-primary" href="{% url 'projects-index' %}" role="button">Go to Project Dashboard</a>
+        {% endif %}
+    </div>
+{% endblock %}

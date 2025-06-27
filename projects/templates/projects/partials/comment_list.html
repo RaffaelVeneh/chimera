@@ -1,18 +1,77 @@
-{% for comment in comments %}
-    <div class="card mb-3">
-        <div class="card-body">
-            <p class="card-text">{{ comment.body }}</p>
-            <p class="card-subtitle text-muted text-end">
-                <small>
-                    Posted by <strong>{{ comment.author.username }}</strong> on {{ comment.created_at|date:"F d, Y, P" }}
-                </small>
-            </p>
-        </div>
+{% if comments_page.has_other_pages %}
+    <div class="pt-3">
+        <nav aria-label="Comment pagination">
+            <ul class="pagination justify-content-center">
+                {% if comments_page.has_previous %}
+                    <li class="page-item">
+                        <a class="page-link" href="#" hx-get="{% url 'comment-list' project.id %}?sort={{ current_sort }}&page={{ comments_page.previous_page_number }}" hx-target="#comment-list-wrapper" hx-swap="innerHTML">Previous</a>
+                    </li>
+                {% else %}
+                    <li class="page-item disabled"><a class="page-link" href="#">Previous</a></li>
+                {% endif %}
+                {% for i in comments_page.paginator.page_range %}
+                    <li class="page-item {% if comments_page.number == i %}active{% endif %}">
+                        <a class="page-link" href="#" hx-get="{% url 'comment-list' project.id %}?sort={{ current_sort }}&page={{ i }}" hx-target="#comment-list-wrapper" hx-swap="innerHTML">{{ i }}</a>
+                    </li>
+                {% endfor %}
+                {% if comments_page.has_next %}
+                    <li class="page-item">
+                        <a class="page-link" href="#" hx-get="{% url 'comment-list' project.id %}?sort={{ current_sort }}&page={{ comments_page.next_page_number }}" hx-target="#comment-list-wrapper" hx-swap="innerHTML">Next</a>
+                    </li>
+                {% else %}
+                    <li class="page-item disabled"><a class="page-link" href="#">Next</a></li>
+                {% endif %}
+            </ul>
+        </nav>
     </div>
+{% endif %}
+
+<div class="d-flex justify-content-first mb-2">
+    <div class="dropdown">
+        <button class="btn btn-sm btn-outline-secondary dropdown-toggle" type="button" data-bs-toggle="dropdown">
+            Sort: {{ current_sort_name }}
+        </button>
+        <ul class="dropdown-menu">
+            {% for sort_val, sort_name in valid_sorts.items %}
+            <li><a class="dropdown-item {% if current_sort == sort_val %}active{% endif %}" href="#"
+                   hx-get="{% url 'comment-list' project.id %}?sort={{ sort_val }}" hx-target="#comment-list-wrapper" hx-swap="innerHTML">{{ sort_name }}</a></li>
+            {% endfor %}
+        </ul>
+    </div>
+</div>
+
+{% for comment in comments_page %}
+    {% include 'projects/partials/comment_item.html' with comment=comment project=project role=role %}
 {% empty %}
     <div class="card">
-        <div class="card-body">
-            No comments yet.
-        </div>
+        <div class="card-body">No comments yet.</div>
     </div>
 {% endfor %}
+
+{% if comments_page.has_other_pages %}
+    <div class="pt-3">
+        <nav aria-label="Comment pagination">
+            <ul class="pagination justify-content-center">
+                {% if comments_page.has_previous %}
+                    <li class="page-item">
+                        <a class="page-link" href="#" hx-get="{% url 'comment-list' project.id %}?sort={{ current_sort }}&page={{ comments_page.previous_page_number }}" hx-target="#comment-list-wrapper" hx-swap="innerHTML">Previous</a>
+                    </li>
+                {% else %}
+                    <li class="page-item disabled"><a class="page-link" href="#">Previous</a></li>
+                {% endif %}
+                {% for i in comments_page.paginator.page_range %}
+                    <li class="page-item {% if comments_page.number == i %}active{% endif %}">
+                        <a class="page-link" href="#" hx-get="{% url 'comment-list' project.id %}?sort={{ current_sort }}&page={{ i }}" hx-target="#comment-list-wrapper" hx-swap="innerHTML">{{ i }}</a>
+                    </li>
+                {% endfor %}
+                {% if comments_page.has_next %}
+                    <li class="page-item">
+                        <a class="page-link" href="#" hx-get="{% url 'comment-list' project.id %}?sort={{ current_sort }}&page={{ comments_page.next_page_number }}" hx-target="#comment-list-wrapper" hx-swap="innerHTML">Next</a>
+                    </li>
+                {% else %}
+                    <li class="page-item disabled"><a class="page-link" href="#">Next</a></li>
+                {% endif %}
+            </ul>
+        </nav>
+    </div>
+{% endif %}

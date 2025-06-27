@@ -1,19 +1,80 @@
 {% extends 'projects/base.html' %}
+{% load project_extras %}
 
 {% block content %}
-    <div class="d-flex justify-content-between align-items-center">
+    <div class="d-flex justify-content-between align-items-center mb-3">
         <h1>Projects</h1>
         <a href="{% url 'create-project' %}" class="btn btn-primary">Create New Project</a>
     </div>
-    <hr>
 
-    <ul class="list-group">
-        {% for project in projects %}
-            <li class="list-group-item">
-                <a href="{% url 'project-detail' project.id %}">
-                    {{ project.title }}
-                </a>
-            </li>
-        {% endfor %}
+    <form method="GET" action="{% url 'project-list' %}" class="mb-4">
+        <div class="input-group">
+            <input type="text" name="q" class="form-control" placeholder="Search projects by title or description..." value="{{ query|default_if_none:'' }}">
+            <button class="btn btn-outline-secondary" type="submit">Search</button>
+        </div>
+    </form>
+
+    <ul class="nav nav-tabs" id="projectTabs" role="tablist">
+        <li class="nav-item" role="presentation">
+            <button class="nav-link {% if active_tab == 'public' %}active{% endif %}" id="public-tab" data-bs-toggle="tab" data-bs-target="#public-projects" type="button" role="tab" aria-controls="public-projects" aria-selected="true">Public Projects</button>
+        </li>
+        <li class="nav-item" role="presentation">
+            <button class="nav-link {% if active_tab == 'team' %}active{% endif %}" id="team-tab" data-bs-toggle="tab" data-bs-target="#team-projects" type="button" role="tab" aria-controls="team-projects" aria-selected="false">Team Projects</button>
+        </li>
+        <li class="nav-item" role="presentation">
+            <button class="nav-link {% if active_tab == 'owned' %}active{% endif %}" id="owned-tab" data-bs-toggle="tab" data-bs-target="#owned-projects" type="button" role="tab" aria-controls="owned-projects" aria-selected="false">My Projects</button>
+        </li>
     </ul>
+
+    <div class="tab-content" id="projectTabsContent">
+
+        <div class="tab-pane fade {% if active_tab == 'public' %}show active{% endif %}" id="public-projects" role="tabpanel">
+            <div class="list-group list-group-flush pt-3">
+                {% for project in public_projects %}
+                    {% include 'projects/partials/project_card.html' with show_notifications=False %}
+                {% endfor %}
+            </div>
+        </div>
+
+        <div class="tab-pane fade {% if active_tab == 'team' %}show active{% endif %}" id="team-projects" role="tabpanel">
+            {% if user.is_authenticated %}    
+                <div class="list-group list-group-flush pt-3">
+                    {% for project in team_projects %}
+                        {% include 'projects/partials/project_card.html' with show_notifications=True %}
+                    {% empty %}
+                        <div class="text-center p-5 card"><h4>You haven't joined any team projects yet.</h4></div>
+                    {% endfor %}
+                </div>
+            {% else %}
+                <div class="text-center p-5 card mt-3">
+                    <h4>Access Your Team's Work</h4>
+                    <p class="text-muted">Projects you are collaborating on will appear here.</p>
+                    <div class="mt-3">
+                        <a href="{% url 'account_login' %}" class="btn btn-primary">Login to Access Team Projects</a>
+                    </div>
+                </div>
+            {% endif %}
+        </div>
+
+        <div class="tab-pane fade {% if active_tab == 'owned' %}show active{% endif %}" id="owned-projects" role="tabpanel">
+            {% if user.is_authenticated %}
+                <div class="list-group list-group-flush pt-3">
+                    {% for project in owned_projects %}
+                        {% include 'projects/partials/project_card.html' with show_notifications=True %}
+                    {% empty %}
+                        <div class="text-center p-5 card"><h4>You don't have any projects yet.</h4></div>
+                    {% endfor %}
+                </div>
+            {% else %}
+                <div class="text-center p-5 card mt-3">
+                    <h4>See Your Projects Here</h4>
+                    <p class="text-muted">Once you create projects, they will appear here.</p>
+                    <div class="mt-3">
+                        <a href="{% url 'account_login' %}" class="btn btn-primary">Login to See Your Projects</a>
+                    </div>
+                </div>
+            {% endif %}
+        </div>
+    </div>
+    
 {% endblock %}

@@ -1,13 +1,74 @@
+{% load tz project_extras %}
 <li class="list-group-item d-flex justify-content-between align-items-center">
-    <span>
-        <input class="form-check-input me-2" type="checkbox"
-               hx-post="{% url 'toggle-task' task.id %}"
-               hx-target="closest li"
-               hx-swap="outerHTML"
-               {% if task.is_completed %}checked{% endif %}>
+    <div class="flex-grow-1 me-2">
+        <span>
+            <input class="form-check-input me-2" type="checkbox"
+                   hx-post="{% url 'toggle-task' task.id %}"
+                   hx-target="closest li"
+                   hx-swap="outerHTML"
+                   {% if task.is_completed %}checked{% endif %}
+                   {% if role == 'viewer' %}disabled{% endif %}>
 
-        <span class="{% if task.is_completed %}text-decoration-line-through{% endif %}">
-            {{ task.title }}
+            <span class="{% if task.is_completed %}text-decoration-line-through{% endif %}">
+                {{ task.title }}
+            </span>
         </span>
-    </span>
+        <small class="d-block text-muted">
+            {% if task.was_edited %}
+                Edited by {{ task.created_by.username }} on {{ task.edited_at|localtime|date:"M. d, Y" }}
+            {% else %}
+                Added by {{ task.created_by.username }} on {{ task.created_at|localtime|date:"M. d, Y" }}
+            {% endif %}
+        </small>
+    </div>
+
+    {% if role in 'owner,admin,editor' %}
+        <div class="d-flex gap-2">
+            <div class="dropdown">
+                <button class="btn btn-sm btn-outline-info dropdown-toggle" type="button" data-bs-toggle="dropdown">Mark</button>
+                <ul class="dropdown-menu">
+                    <li>
+                        <button class="dropdown-item" hx-post="{% url 'toggle-pin-task' task.id %}">
+                            {% if user in task.pinned_by.all %}Unpin for Myself{% else %}Pin for Myself{% endif %}
+                        </button>
+                    </li>
+                    <li><hr class="dropdown-divider"></li>
+                    <li class="dropdown-header">Mark for a team member:</li>
+                    <li>
+                        <button class="dropdown-item"
+                                hx-get="{% url 'confirm-mark-task' task.id %}?assignee=all"
+                                hx-target="#dialog" data-bs-toggle="modal" data-bs-target="#modal">
+                            For All Members
+                        </button>
+                    </li>
+                    {% for member in project.members %}
+                        {% if member != user %}
+                            <li>
+                                <button class="dropdown-item {% if member.id in task.assigned_user_ids %}disabled{% endif %}"
+                                        hx-get="{% url 'confirm-mark-task' task.id %}?assignee={{ member.id }}"
+                                        hx-target="#dialog" data-bs-toggle="modal" data-bs-target="#modal">
+                                    {{ member.username }} {% if member.id in task.assigned_user_ids %}(Marked){% endif %}
+                                </button>
+                            </li>
+                        {% endif %}
+                    {% endfor %}
+                </ul>
+            </div>
+
+            <button class="btn btn-sm btn-outline-secondary"
+                    hx-get="{% url 'edit-task' task.id %}"
+                    hx-target="closest li"
+                    hx-swap="outerHTML">
+                Edit
+            </button>
+
+            <button class="btn btn-sm btn-outline-danger"
+                    hx-get="{% url 'delete-task' task.id %}"
+                    hx-target="#dialog"
+                    data-bs-toggle="modal"
+                    data-bs-target="#modal">
+                &times;
+            </button>
+        </div>
+    {% endif %}
 </li>

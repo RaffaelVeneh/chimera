@@ -22,11 +22,14 @@ from django.urls import path, include
 from django.views.generic.base import RedirectView
 from projects import views as project_views
 
-urlpatterns = [
-    path('', RedirectView.as_view(url='/projects/', permanent=True), name='home'),
+urlpatterns = [    path('admin/', admin.site.urls),
+    path('accounts/', include('allauth.urls')),
     
-    path('admin/', admin.site.urls),
-    path('logout/', project_views.logout_view, name='logout'),
+    path('', RedirectView.as_view(url='/dashboard/projects/', permanent=False), name='home'),
+    path('dashboard/', RedirectView.as_view(url='/dashboard/projects/', permanent=False), name='dashboard'),
+    path('dashboard/projects/', project_views.index, name='project-list'),
+    path('dashboard/<str:username>/', project_views.dashboard, name='dashboard'),
+
     path('projects/', include('projects.urls')),
     path('papers/', include('knowledge_hub.urls')),
 ]
