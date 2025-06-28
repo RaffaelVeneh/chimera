@@ -15,8 +15,6 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Copy the rest of the project code into the container
 COPY . .
 
-WORKDIR /app/chimera
-
 RUN python manage.py collectstatic --noinput
 
 # Expose the port the app runs on
