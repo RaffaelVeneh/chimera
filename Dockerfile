@@ -1,5 +1,5 @@
 # Use an official Python runtime as a parent image
-FROM mcr.microsoft.com/appsvc/python:3.11-bullseye
+FROM python:3.13-slim
 
 # Set environment variables
 ENV PYTHONDONTWRITEBYTECODE=1
@@ -20,4 +20,4 @@ EXPOSE 8000
 
 # The command to run when the container starts.
 # It collects static files and then starts the Gunicorn server.
-CMD ["gunicorn", "chimera_core.wsgi:application", "--bind", "0.0.0.0:8000"]
+CMD ["sh", "-c", "python manage.py collectstatic --noinput && gunicorn chimera_core.wsgi:application --bind 0.0.0.0:8000"]
