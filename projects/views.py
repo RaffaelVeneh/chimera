@@ -1,6 +1,7 @@
 import pandas as pd
 import plotly.express as px
 
+from django.views.decorators.http import require_POST
 from django.http import HttpResponse
 from django.urls import reverse
 from django.shortcuts import render, redirect, get_object_or_404
@@ -11,33 +12,94 @@ from django.contrib.auth.decorators import login_required
 from django.http import HttpResponseForbidden, JsonResponse
 from django.db.models import Count, Q
 from django.core.paginator import Paginator
+from django.template.loader import render_to_string
+from django.utils import timezone
 from itertools import chain
 from operator import attrgetter
 
-from .models import Project, Task, Comment, User, ProjectMembership, AccessRequest, TaskAssignment, PersonalTodo
+from .models import Project, Task, Comment, User, ProjectMembership, AccessRequest, TaskAssignment, PersonalTodo, Ban, Report, ProjectLog
 from .forms import ProjectForm, TaskForm, CommentForm, ProjectFileForm, ProjectFile
+from users.models import FriendRequest
+
+def annotate_task_with_states(task, project):
+    """
+    Calculates the marking/pinning state for a task and attaches it
+    to the task object for use in templates.
+    """
+    # Get IDs of all members in the project
+    project_member_ids = {member.id for member in project.members}
+
+    # Get IDs of all users who have been assigned this task
+    assigned_user_ids = {assignment.assignee_id for assignment in task.assignments.all()}
+    
+    # Get IDs of all users who have pinned this task
+    pinned_user_ids = {user.id for user in task.pinned_by.all()}
+
+    # Combine the sets to find all "marked" users
+    all_marked_ids = assigned_user_ids.union(pinned_user_ids)
+
+    # Attach the final boolean flag to the task object
+    task.all_members_marked = project_member_ids.issubset(all_marked_ids)
+
+    # Also attach assigned user IDs, which we still need for other button states
+    task.assigned_user_ids = list(assigned_user_ids)
+    
+    return task
 
 def get_user_role(project, user):
-    """Helper function to get a user's role on a specific project."""
-    if not user.is_authenticated:
-        return None
-    
-    if project.owner == user:
-        return 'owner'
+    if not user.is_authenticated: return None
+    if project.owner == user: return 'owner'
     try:
-        membership = ProjectMembership.objects.get(project=project, user=user)
-        return membership.role
+        return ProjectMembership.objects.get(project=project, user=user).role
     except ProjectMembership.DoesNotExist:
         return None
+    
+def _get_manage_team_context(request, project):
+    requesting_user_role = get_user_role(project, request.user)
+    
+    memberships = ProjectMembership.objects.filter(project=project).select_related('user')
+    for m in memberships:
+        m.is_editable = (requesting_user_role == 'owner' or (requesting_user_role == 'admin' and m.role not in ['owner', 'admin']))
+        if requesting_user_role == 'owner':
+            m.permissible_roles = ProjectMembership.ROLE_CHOICES
+        else:
+            m.permissible_roles = [r for r in ProjectMembership.ROLE_CHOICES if r[0] != 'admin']
+
+    potential_collaborators = User.objects.none()
+    if requesting_user_role in ['owner', 'admin']:
+        current_member_ids = [m.user.id for m in memberships] + [project.owner.id]
+        potential_collaborators = User.objects.exclude(id__in=current_member_ids)
+
+    banned_list = Ban.objects.filter(project=project).select_related('user')
+    for b in banned_list:
+        # --- FIX: Admins can now unban non-admins. Owners can unban anyone. ---
+        b.can_unban = (requesting_user_role == 'owner' or (requesting_user_role == 'admin' and b.role != 'admin'))
+        
+    return {
+        'project': project, 'memberships': memberships,
+        'potential_collaborators': potential_collaborators,
+        'banned_list': banned_list, 'role': requesting_user_role, 'request': request,
+    }
     
 @login_required
 def dashboard(request, username):
     page_user = get_object_or_404(User, username=username)
+    if request.user != page_user:
+        return redirect('project-list')
+    
+    all_friends = page_user.profile.get_friends()
+    all_incoming_requests = FriendRequest.objects.filter(to_user=page_user, status='pending')
+    
+    friends_preview = all_friends[:5]
+    incoming_requests_preview = all_incoming_requests[:5]
+    
+    total_friends_count = len(all_friends)
+    total_incoming_requests_count = all_incoming_requests.count()
+    
     if page_user != request.user:
         return HttpResponseForbidden("You can only view your own dashboard.")
-
-    # Get Projects
-    owned_projects = Project.objects.filter(owner=page_user)
+    
+    owned_projects = Project.objects.filter(owner=request.user)
     team_projects = Project.objects.filter(collaborators=page_user).exclude(owner=page_user)
 
     # Get Tasks for the new dashboard sections
@@ -64,48 +126,32 @@ def dashboard(request, username):
         'pinned_tasks': pinned_tasks,
         'assignments_for_me': assignments_for_me,
         'activity_list': activity_list,
+        'friends': friends_preview,
+        'incoming_requests': incoming_requests_preview,
+        'total_friends_count': total_friends_count,
+        'total_incoming_requests_count': total_incoming_requests_count,
     }
     return render(request, 'projects/dashboard.html', context)
     
 def index(request):
-    user = request.user
+    # This view seems to be your project list page
+    # I'll add the necessary logic based on your index.html template
+    query = request.GET.get('q')
     active_tab = request.GET.get('tab', 'public')
 
-    owned_projects = Project.objects.none()
-    team_projects = Project.objects.none()
-
-    if user.is_authenticated:
-        # All the counting logic should be INSIDE this "if" block.
-
-        # Get the querysets
-        owned_projects = Project.objects.filter(owner=user)
-        team_project_ids = ProjectMembership.objects.filter(user=user).exclude(project__owner=user).values_list('project_id', flat=True)
-        team_projects = Project.objects.filter(id__in=team_project_ids)
-
-        # Do the notification counts
-        for project in owned_projects:
-            project.unread_tasks_count = project.tasks.exclude(read_by=user).count()
-            project.unread_comments_count = project.comments.exclude(read_by=user).count()
-            project.pending_requests_count = project.access_requests.filter(status='pending').count()
-            project.unread_files_count = project.files.exclude(read_by=user).count()
-
-        for project in team_projects:
-            project.unread_tasks_count = project.tasks.exclude(read_by=user).count()
-            project.unread_comments_count = project.comments.exclude(read_by=user).count()
-            project.unread_files_count = project.files.exclude(read_by=user).count()
-
-    # Public projects are fetched for everyone
     public_projects = Project.objects.filter(is_public=True)
+    team_projects = Project.objects.filter(collaborators=request.user) if request.user.is_authenticated else Project.objects.none()
+    owned_projects = Project.objects.filter(owner=request.user) if request.user.is_authenticated else Project.objects.none()
 
-    # Filter public projects if there is a search query
-    query = request.GET.get('q', '')
     if query:
         public_projects = public_projects.filter(Q(title__icontains=query) | Q(description__icontains=query))
+        team_projects = team_projects.filter(Q(title__icontains=query) | Q(description__icontains=query))
+        owned_projects = owned_projects.filter(Q(title__icontains=query) | Q(description__icontains=query))
 
     context = {
-        'owned_projects': owned_projects,
-        'team_projects': team_projects,
         'public_projects': public_projects,
+        'team_projects': team_projects,
+        'owned_projects': owned_projects,
         'active_tab': active_tab,
         'query': query,
     }
@@ -114,13 +160,14 @@ def index(request):
 @login_required
 def project_detail(request, project_id):
     project = get_object_or_404(Project, pk=project_id)
+    
+    if Ban.objects.filter(project=project, user=request.user).exists():
+        return render(request, 'projects/banned_page.html', {'project': project}, status=403)
+    
     role = get_user_role(project, request.user)
 
     # The authorization check is now simpler:
-    # Deny access if the project is private AND the user has no role.
     if not project.is_public and role is None:
-        # We will now create a dedicated page for this, as per your earlier request.
-        # For now, let's keep the simple forbidden response. We'll build the page next.
         return render(request, '403.html', {'project': project}, status=403)
 
     # --- The rest of the view is unchanged ---
@@ -143,15 +190,11 @@ def create_project(request):
             project = form.save(commit=False)
             project.owner = request.user
             project.save()
-            messages.success(request, f"Project '{project.title}' was created successfully!")
-            return redirect('projects-index')
+            messages.success(request, 'Project created successfully!')
+            return redirect('project-detail', project_id=project.id)
     else:
         form = ProjectForm()
-
-    context = {
-        'form': form,
-    }
-    return render(request, 'projects/create_project.html', context)
+    return render(request, 'projects/create_project.html', {'form': form})
 
 @login_required
 def edit_project(request, project_id):
@@ -261,7 +304,10 @@ def edit_task(request, task_id):
         form = TaskForm(request.POST, instance=task)
         if form.is_valid():
             form.save()
-            return render(request, 'projects/partials/task_item.html', {'task': task, 'project': project, 'role': role})
+            # --- FIX: Return an empty response that triggers a list refresh ---
+            response = HttpResponse(status=204) # 204 No Content
+            response['HX-Trigger'] = 'refresh-lists'
+            return response
         
     form = TaskForm(instance=task)
     return render(request, 'projects/partials/edit_task_form.html', {'form': form, 'task': task})
@@ -302,8 +348,8 @@ def task_list(request, project_id):
     # Mark as read logic
     if request.user.is_authenticated:
         for task in page_obj:
+            task = annotate_task_with_states(task, project)
             task.read_by.add(request.user)
-            task.assigned_user_ids = list(task.assignments.values_list('assignee_id', flat=True))
 
     context = {
         'project': project, 'tasks_page': page_obj, 'role': role,
@@ -325,6 +371,8 @@ def toggle_task(request, task_id):
 
     task.is_completed = not task.is_completed
     task.save()
+    
+    task = annotate_task_with_states(task, project)
 
     context = {
         'task': task,
@@ -396,9 +444,20 @@ def mark_task_for_user(request, task_id):
         assignee_id = request.POST.get('assignee')
 
         if assignee_id == 'all':
+            # --- START OF FIX ---
+
+            # 1. Pin the task for the current user.
+            task.pinned_by.add(request.user)
+
+            # 2. Get all members of the project.
             members = [task.project.owner] + list(task.project.collaborators.all())
+
+            # 3. Create an assignment for everyone ELSE.
             for member in members:
-                TaskAssignment.objects.get_or_create(task=task, assignee=member, assigner=assigner)
+                if member != request.user:
+                    TaskAssignment.objects.get_or_create(task=task, assignee=member, assigner=assigner)
+            
+            # --- END OF FIX ---
         else:
             assignee = get_object_or_404(User, pk=assignee_id)
             TaskAssignment.objects.get_or_create(task=task, assignee=assignee, assigner=assigner)
@@ -444,48 +503,59 @@ def add_comment(request, project_id):
     response['HX-Trigger'] = 'refresh-lists'
     return response
 
+@login_required
 def comment_list(request, project_id):
-    project = Project.objects.get(pk=project_id)
-    
-    if not project.is_public and not request.user.is_authenticated:
-        return HttpResponseForbidden() # Or an empty response
-    
-    role = get_user_role(project, request.user)
+    project = get_object_or_404(Project, id=project_id)
+    viewer_role = get_user_role(project, request.user)
 
-    if not project.is_public and role is None:
-        return HttpResponseForbidden()
+    if viewer_role is None and not project.is_public:
+        return HttpResponseForbidden("You cannot view comments for this project.")
 
-    # --- NEW: Sorting Logic ---
+    # --- FIX: Added sorting logic back in ---
     valid_sorts = {
         '-created_at': 'Newest First',
         'created_at': 'Oldest First',
     }
-    sort_by = request.GET.get('sort', '-created_at')
-    if sort_by not in valid_sorts:
-        sort_by = '-created_at'
+    # Get sort parameter from the request, default to newest first
+    current_sort = request.GET.get('sort', '-created_at')
+    if current_sort not in valid_sorts:
+        current_sort = '-created_at'
 
-    comments_queryset = project.comments.all().order_by(sort_by)
+    # Apply the sorting to the queryset
+    comments = Comment.objects.filter(project=project).select_related('author').order_by(current_sort)
+    # --- END FIX ---
 
-    # --- NEW: Pagination Logic (20 per page) ---
-    paginator = Paginator(comments_queryset, 20)
+    # Set permissions for each comment
+    for comment in comments:
+        is_self = (request.user == comment.author)
+        commenter_role = get_user_role(project, comment.author)
+
+        # Deletion logic
+        can_delete = False
+        if is_self or viewer_role == 'owner' or (viewer_role == 'admin' and commenter_role not in ['owner', 'admin']):
+            can_delete = True
+        comment.can_be_deleted = can_delete
+        
+        # Reporting logic
+        can_report = False
+        if not is_self:
+            if viewer_role in ['editor', 'viewer'] or (viewer_role == 'admin' and commenter_role in ['owner', 'admin']):
+                can_report = True
+        comment.can_be_reported = can_report
+        
+    paginator = Paginator(comments, 10)
     page_number = request.GET.get('page')
-    page_obj = paginator.get_page(page_number)
-
-    # Mark as read logic
-    if request.user.is_authenticated:
-        for comment in page_obj:
-            comment.read_by.add(request.user)
+    comments_page = paginator.get_page(page_number)
 
     context = {
         'project': project,
-        'comments_page': page_obj, # Pass the page object
-        'role': role,
-        'current_sort': sort_by,
-        'current_sort_name': valid_sorts.get(sort_by),
+        'comments_page': comments_page,
+        'role': viewer_role,
+        # Pass sorting context to the template
         'valid_sorts': valid_sorts,
+        'current_sort': current_sort,
+        'current_sort_name': valid_sorts.get(current_sort)
     }
-
-    # This view now renders a new, more powerful comment list component
     return render(request, 'projects/partials/comment_list.html', context)
 
 @login_required
@@ -510,86 +580,199 @@ def edit_comment(request, comment_id):
     return render(request, 'projects/partials/edit_comment_form.html', {'form': form, 'comment': comment})
 
 
+@require_POST
 @login_required
 def delete_comment(request, comment_id):
-    comment = Comment.objects.get(pk=comment_id)
+    """Deletes a comment after checking permissions."""
+    comment = get_object_or_404(Comment, id=comment_id)
     project = comment.project
-    role = get_user_role(project, request.user)
+    requesting_user_role = get_user_role(project, request.user)
+    comment_author_role = get_user_role(project, comment.author)
 
-    # Authorization: You can delete your own comment, OR if you are an owner/admin.
-    if not (comment.author == request.user or role in ['owner', 'admin']):
+    # This is the permission logic fix, matching the one above.
+    can_delete = False
+    if comment.author == request.user:
+        can_delete = True
+    elif requesting_user_role == 'owner':
+        can_delete = True
+    elif requesting_user_role == 'admin' and comment_author_role not in ['owner', 'admin']:
+        can_delete = True
+
+    if not can_delete:
         return HttpResponseForbidden("You do not have permission to delete this comment.")
 
-    if request.method == 'POST':
-        comment.delete()
-        response = HttpResponse(status=204)
-        response['HX-Redirect'] = reverse('project-detail', kwargs={'project_id': project.id})
-        return response
+    comment.delete()
     
-    context = {'comment': comment}
-    return render(request, 'projects/partials/delete_comment_modal.html', context)
+    # This HX-Trigger tells the frontend to refresh the comment list
+    response = HttpResponse(status=200)
+    response['HX-Trigger'] = 'refresh-lists'
+    return response
 
 @login_required
 def manage_collaborators(request, project_id):
-    project = Project.objects.get(pk=project_id)
+    """Renders the main manage collaborators page."""
+    project = get_object_or_404(Project, id=project_id)
+    context = _get_manage_team_context(request, project)
 
-    if project.owner != request.user:
-        return HttpResponseForbidden("You are not allowed to manage collaborators for this project.")
+    if context['role'] is None:
+        return HttpResponseForbidden("You are not a member of this project.")
+        
+    return render(request, 'projects/manage_collaborators.html', context)
 
+@login_required
+def get_remove_user_modal(request, membership_id):
+    """Renders the confirmation modal for removing a user."""
+    membership = get_object_or_404(ProjectMembership, id=membership_id)
+    return render(request, 'projects/partials/remove_collaborator_modal.html', {'membership': membership})
+
+@login_required
+def get_ban_user_modal(request, membership_id):
+    """Renders the confirmation modal for banning a user."""
+    membership = get_object_or_404(ProjectMembership, id=membership_id)
+    return render(request, 'projects/partials/ban_user_modal.html', {'membership': membership})
+
+@login_required
+def get_unban_user_modal(request, ban_id):
+    """Renders the confirmation modal for unbanning a user."""
+    ban = get_object_or_404(Ban, id=ban_id)
+    return render(request, 'projects/partials/unban_user_modal.html', {'ban': ban})
+
+def get_manage_team_context(request, project):
+    """
+    A single, authoritative function to get all context needed
+    for the manage_collaborators page and its partials.
+    """
+    current_user_role = get_user_role(project, request.user)
     memberships = ProjectMembership.objects.filter(project=project)
-    involved_user_ids = [project.owner.id] + [m.user.id for m in memberships]
-    potential_collaborators = User.objects.exclude(pk=project.owner.pk).exclude(pk__in=project.collaborators.all())
+    
+    banned_list = Ban.objects.filter(project=project)
+    for member in memberships:
+        member.is_editable = (current_user_role == 'owner') or (current_user_role == 'admin' and member.role in ['editor', 'viewer'])
 
-    context = {
+        if current_user_role == 'owner':
+            member.permissible_roles = list(ProjectMembership.Role.choices)
+        else:
+            member.permissible_roles = [(v, n) for v, n in ProjectMembership.Role.choices if v != 'admin']
+
+    for ban in banned_list:
+            # ... (can_unban calculation) ...
+            ban.can_unban = (current_user_role == 'owner') or (current_user_role == 'admin' and ban.role_at_ban != 'admin')
+                
+    involved_user_ids = [project.owner.id] + [m.user.id for m in memberships]
+    potential_collaborators = User.objects.exclude(id__in=involved_user_ids)
+    
+    return {
         'project': project,
         'memberships': memberships,
         'potential_collaborators': potential_collaborators,
+        'banned_list': banned_list,
+        'role': current_user_role,
     }
-    return render(request, 'projects/manage_collaborators.html', context)
+    
+@require_POST
+@login_required
+def ban_user(request, membership_id):
+    membership = get_object_or_404(ProjectMembership, id=membership_id)
+    project = membership.project
+    requesting_user_role = get_user_role(project, request.user)
+    
+    if not (requesting_user_role == 'owner' or (requesting_user_role == 'admin' and membership.role != 'admin')):
+        return HttpResponseForbidden("You do not have permission to ban this user.")
 
-def render_collaborator_lists(request, project):
-    """A helper function to prevent repeating code."""
-    memberships = ProjectMembership.objects.filter(project=project)
-    involved_user_ids = [project.owner.id] + [m.user.id for m in memberships]
-    potential_collaborators = User.objects.exclude(id__in=involved_user_ids)
-    context = {
-        'project': project,
-        'memberships': memberships,
-        'potential_collaborators': potential_collaborators
-    }
-    return render(request, 'projects/partials/collaborator_lists.html', context)
+    Ban.objects.create(
+        project=project,
+        user=membership.user,
+        banned_by=request.user,
+        role=membership.role,
+    )
+    
+    user_banned = membership.user.username
+    membership.delete()
+    messages.error(request, f"{user_banned} has been BANNED from the project.")
 
+    context = _get_manage_team_context(request, project)
+    return render(request, 'projects/partials/_manage_team_content.html', context)
+
+@require_POST
+@login_required
+def unban_user(request, ban_id):
+    ban = get_object_or_404(Ban, id=ban_id)
+    project = ban.project
+    requesting_user_role = get_user_role(project, request.user)
+
+    # --- FIX: Re-implement correct permission check using the stored role ---
+    if not (requesting_user_role == 'owner' or (requesting_user_role == 'admin' and ban.role != 'admin')):
+         return HttpResponseForbidden("You do not have permission to perform this action.")
+
+    user_unbanned = ban.user.username
+    ban.delete()
+    messages.success(request, f"User {user_unbanned} has been unbanned.")
+
+    context = _get_manage_team_context(request, project)
+    return render(request, 'projects/partials/_manage_team_content.html', context)
+
+@login_required
+def get_unban_user_modal(request, ban_id):
+    """
+    This view's only purpose is to fetch the context for
+    and render the unban confirmation modal.
+    """
+    ban = get_object_or_404(Ban, id=ban_id)
+    context = {'ban': ban}
+    return render(request, 'projects/partials/unban_user_modal.html', context)
+
+@require_POST
 @login_required
 def add_collaborator(request, project_id, user_id):
-    project = Project.objects.get(pk=project_id)
-    if project.owner != request.user:
-        return HttpResponseForbidden()
-    if request.method == 'POST':
-        user_to_add = User.objects.get(pk=user_id)
-        role = request.POST.get('role')
-        ProjectMembership.objects.create(project=project, user=user_to_add, role=role)
-    return render_collaborator_lists(request, project)
+    project = get_object_or_404(Project, id=project_id)
+    user_to_add = get_object_or_404(User, id=user_id)
+    requesting_user_role = get_user_role(project, request.user)
 
+    if requesting_user_role not in ['owner', 'admin']:
+        return HttpResponseForbidden("You do not have permission to add collaborators.")
+
+    role = request.POST.get('role', 'viewer')
+    ProjectMembership.objects.create(project=project, user=user_to_add, role=role)
+    messages.success(request, f"{user_to_add.username} was added as a(n) {role}.")
+    
+    context = _get_manage_team_context(request, project)
+    return render(request, 'projects/partials/_manage_team_content.html', context)
+
+@require_POST
 @login_required
 def remove_membership(request, membership_id):
-    membership = ProjectMembership.objects.get(pk=membership_id)
+    membership = get_object_or_404(ProjectMembership, id=membership_id)
     project = membership.project
-    if project.owner != request.user:
-        return HttpResponseForbidden()
-    if request.method == 'POST':
-        membership.delete()
-    return render_collaborator_lists(request, project)
+    requesting_user_role = get_user_role(project, request.user)
 
+    if not (requesting_user_role == 'owner' or (requesting_user_role == 'admin' and membership.role != 'admin')):
+        return HttpResponseForbidden("You do not have permission to remove this user.")
+
+    user_removed = membership.user.username
+    project = membership.project
+    membership.delete()
+    messages.info(request, f"{user_removed} was removed from the project.")
+
+    context = _get_manage_team_context(request, project)
+    return render(request, 'projects/partials/_manage_team_content.html', context)
+
+@require_POST
 @login_required
 def change_role(request, membership_id):
-    membership = ProjectMembership.objects.get(pk=membership_id)
+    membership = get_object_or_404(ProjectMembership, id=membership_id)
     project = membership.project
-    if project.owner != request.user:
-        return HttpResponseForbidden()
-    if request.method == 'POST':
-        membership.role = request.POST.get('role')
-        membership.save()
-    return render_collaborator_lists(request, project)
+    requesting_user_role = get_user_role(project, request.user)
+    
+    if not (requesting_user_role == 'owner' or (requesting_user_role == 'admin' and membership.role != 'admin')):
+        return HttpResponseForbidden("...")
+
+    new_role = request.POST.get('role')
+    membership.role = new_role
+    membership.save()
+    messages.success(request, f"{membership.user.username}'s role was updated to {new_role}.")
+
+    context = _get_manage_team_context(request, membership.project)
+    return render(request, 'projects/partials/_manage_team_content.html', context)
 
 @login_required
 def remove_collaborator(request, project_id, user_id):
@@ -846,12 +1029,14 @@ def toggle_pin_task(request, task_id):
     else:
         task.pinned_by.add(user)
 
-    return dashboard_pinned_tasks(request)
+    # --- FIX: Return an empty response that triggers a list refresh ---
+    response = HttpResponse(status=204) # 204 No Content
+    response['HX-Trigger'] = 'refresh-lists'
+    return response
 
 @login_required
 def dismiss_assignment(request, assignment_id):
     assignment = get_object_or_404(TaskAssignment, pk=assignment_id)
-    # Check that the person dismissing is the person it was assigned to
     if assignment.assignee == request.user and request.method == 'POST':
         assignment.delete()
 
@@ -868,3 +1053,233 @@ def dashboard_assignments(request):
     user = request.user
     assignments_for_me = TaskAssignment.objects.filter(assignee=user)
     return render(request, 'projects/partials/dashboard_assignments.html', {'assignments_for_me': assignments_for_me, 'user': user})
+
+@login_required
+def leave_project(request, project_id):
+    project = get_object_or_404(Project, pk=project_id)
+    
+    # The owner cannot leave, they must delete the project
+    if project.owner == request.user:
+        return HttpResponseForbidden("The project owner cannot leave the project.")
+
+    if request.method == 'POST':
+        # Find and delete the user's membership
+        membership = get_object_or_404(ProjectMembership, project=project, user=request.user)
+        membership.delete()
+        ProjectLog.objects.create(
+            project=project,
+            user=request.user,
+            log_message=f"{request.user.username} has left the project."
+        )
+        prune_logs(project.id)
+        messages.success(request, f"You have successfully left the project '{project.title}'.")
+        
+        # For HTMX, send a header to redirect the user away from the page
+        response = HttpResponse(status=204)
+        response['HX-Redirect'] = reverse('project-list')
+        return response
+
+    # On GET request, return the modal content
+    return render(request, 'projects/partials/leave_project_modal.html', {'project': project})
+
+@login_required
+def report_comment(request, comment_id):
+    comment = get_object_or_404(Comment, pk=comment_id)
+    project = comment.project
+
+    # Permission checks
+    if comment.author == request.user:
+        return HttpResponse("You cannot report your own comment.", status=403)
+    if comment.author == project.owner:
+        return HttpResponse("You cannot report the project owner.", status=403)
+
+    if request.method == 'POST':
+        # Check if this user has already reported this comment
+        existing_report = Report.objects.filter(reported_comment=comment, reporter=request.user).first()
+        if existing_report:
+            # Re-open the existing report if it was dismissed
+            existing_report.status = Report.Status.OPEN
+            existing_report.reason = request.POST.get('reason', '')
+            existing_report.reported_at = timezone.now()
+            existing_report.save()
+        else:
+            # Create a new report
+            Report.objects.create(
+                reported_comment=comment,
+                reporter=request.user,
+                reported_user=comment.author,
+                reason=request.POST.get('reason', '')
+            )
+        
+        prune_reports(project.id)
+        return HttpResponse('<div class="modal-body"><p class="text-success">Thank you. Your report has been submitted.</p></div>')
+
+    # On GET, render the modal content
+    context = {'comment': comment}
+    return render(request, 'projects/partials/report_comment_modal.html', context)
+
+@login_required
+def project_inbox(request, project_id):
+    project = get_object_or_404(Project, pk=project_id)
+    role = get_user_role(project, request.user)
+
+    # Any member of the project can view the inbox page.
+    if role is None:
+        return HttpResponseForbidden("You do not have permission to view this page.")
+
+    # Fetch reports and logs
+    reports = Report.objects.filter(reported_comment__project=project)
+    logs = ProjectLog.objects.filter(project=project)
+
+    context = {
+        'project': project,
+        'role': role,
+        'reports': reports,
+        'logs': logs,
+    }
+    return render(request, 'projects/inbox.html', context)
+
+@login_required
+def inbox_preview(request, project_id):
+    project = get_object_or_404(Project, pk=project_id)
+    role = get_user_role(project, request.user)
+
+    if role is None:
+        return HttpResponseForbidden()
+
+    # Fetch the 3 most recent reports and logs for the preview
+    reports = Report.objects.filter(reported_comment__project=project)[:3]
+    logs = ProjectLog.objects.filter(project=project)[:3]
+
+    context = {
+        'project': project,
+        'role': role,
+        'reports': reports,
+        'logs': logs,
+    }
+    return render(request, 'projects/partials/inbox_preview_modal.html', context)
+
+def prune_reports(project_id):
+    """Keeps the number of reports for a project at or below 25."""
+    report_limit = 25
+    report_count = Report.objects.filter(reported_comment__project_id=project_id).count()
+    if report_count > report_limit:
+        oldest_reports = Report.objects.filter(reported_comment__project_id=project_id).order_by('reported_at')[:report_count - report_limit]
+        for report in oldest_reports:
+            report.delete()
+
+def prune_logs(project_id):
+    """Keeps the number of logs for a project at or below 50."""
+    log_limit = 50
+    log_count = ProjectLog.objects.filter(project_id=project_id).count()
+    if log_count > log_limit:
+        oldest_logs = ProjectLog.objects.filter(project_id=project_id).order_by('created_at')[:log_count - log_limit]
+        for log in oldest_logs:
+            log.delete()
+            
+@login_required
+def kick_user(request, membership_id):
+    membership = get_object_or_404(ProjectMembership, pk=membership_id)
+    project = membership.project
+    kicker_role = get_user_role(project, request.user)
+
+    # --- Permission Checks ---
+    if kicker_role not in ['owner', 'admin']:
+        return HttpResponseForbidden("You do not have permission to perform this action.")
+    if membership.role == 'owner':
+        return HttpResponseForbidden("You cannot kick the project owner.")
+    if kicker_role == 'admin' and membership.role == 'admin':
+        return HttpResponseForbidden("Admins cannot kick other admins.")
+
+    if request.method == 'POST':
+        log_message = f"{membership.user.username} was kicked from the project by {request.user.username}."
+        membership.delete()
+        ProjectLog.objects.create(project=project, user=request.user, log_message=log_message)
+        prune_logs(project.id)
+        
+        response = HttpResponse(status=204)
+        response['HX-Trigger'] = 'refresh-lists' # Refresh the comment list
+        return response
+
+    return render(request, 'projects/partials/kick_user_modal.html', {'membership': membership})
+
+@login_required
+def kick_and_ban_user(request, membership_id):
+    membership = get_object_or_404(ProjectMembership, pk=membership_id)
+    project = membership.project
+    kicker_role = get_user_role(project, request.user)
+
+    # --- Permission Checks ---
+    if kicker_role not in ['owner', 'admin']:
+        return HttpResponseForbidden("You do not have permission to perform this action.")
+    if membership.role == 'owner':
+        return HttpResponseForbidden("You cannot kick the project owner.")
+    if kicker_role == 'admin' and membership.role == 'admin':
+        return HttpResponseForbidden("Admins cannot kick other admins.")
+
+    if request.method == 'POST':
+        log_message = f"{membership.user.username} was kicked and banned from the project by {request.user.username}."
+        
+        # Create the ban record BEFORE deleting the membership
+        Ban.objects.get_or_create(
+            project=project, user=membership.user,
+            defaults={'banned_by': request.user, 'role_at_ban': membership.role}
+        )
+        membership.delete() # Then delete the membership
+        
+        ProjectLog.objects.create(project=project, user=request.user, log_message=log_message)
+        prune_logs(project.id)
+
+        response = HttpResponse(status=204)
+        response['HX-Trigger'] = 'refresh-lists'
+        return response
+
+    return render(request, 'projects/partials/kick_and_ban_user_modal.html', {'membership': membership})
+
+def get_comment_context(request, comment_id):
+    """
+    A helper function to gather all context and permissions for a single comment.
+    """
+    comment = get_object_or_404(Comment, id=comment_id)
+    viewer_role = get_user_role(comment.project, request.user)
+    is_self = (comment.author == request.user)
+    commenter_role = get_user_role(comment.project, comment.author)
+
+    # --- START: FIX for delete permissions ---
+    can_be_deleted = False
+    if is_self:
+        can_be_deleted = True
+    elif viewer_role == 'owner':
+        can_be_deleted = True
+    elif viewer_role == 'admin' and commenter_role not in ['owner', 'admin']:
+        can_be_deleted = True
+    comment.can_be_deleted = can_be_deleted
+    # --- END: FIX ---
+
+    # Reporting logic (remains the same)
+    comment.can_be_reported = False
+    if not is_self:
+        if viewer_role in ['editor', 'viewer']:
+            comment.can_be_reported = True
+        elif viewer_role == 'admin' and commenter_role in ['owner', 'admin']:
+            # This seems like an old rule, but I'll leave it. It means admins can report other admins/owners.
+            comment.can_be_reported = True
+
+    # Moderation logic (remains the same)
+    comment.can_be_moderated = False
+    if not is_self and commenter_role != 'owner':
+        if viewer_role == 'owner' or (viewer_role == 'admin' and commenter_role in ['editor', 'viewer']):
+            comment.can_be_moderated = True
+            comment.membership = ProjectMembership.objects.filter(project=comment.project, user=comment.author).first()
+
+    return {'comment': comment, 'project': comment.project, 'role': viewer_role, 'user': request.user}
+
+@login_required
+def get_comment_main_menu(request, comment_id):
+    context = get_comment_context(request, comment_id)
+    return render(request, 'projects/partials/_comment_main_menu.html', context)
+
+@login_required
+def get_comment_moderation_menu(request, comment_id):
+    context = get_comment_context(request, comment_id)
+    return render(request, 'projects/partials/_comment_moderation_menu.html', context)

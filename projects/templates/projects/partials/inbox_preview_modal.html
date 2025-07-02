@@ -1,0 +1,41 @@
+<div class="modal-content">
+    <div class="modal-header">
+        <h5 class="modal-title">Project Inbox Preview</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+    </div>
+    <div class="modal-body">
+        {% if role in 'owner,admin' %}
+            <h6>Recent Reports</h6>
+            <div class="list-group mb-3">
+                {% for report in reports %}
+                    <div class="list-group-item list-group-item-action">
+                        <div class="d-flex w-100 justify-content-between">
+                            <h6 class="mb-1">Report by {{ report.reporter.username }}</h6>
+                            <small>{{ report.reported_at|timesince }} ago</small>
+                        </div>
+                        <p class="mb-1 small">Reason: {{ report.reason|default:"No reason provided."|truncatechars:70 }}</p>
+                    </div>
+                {% empty %}
+                    <div class="list-group-item">No new reports.</div>
+                {% endfor %}
+            </div>
+        {% endif %}
+
+        <h6>Recent Activity</h6>
+        <div class="list-group">
+            {% for log in logs %}
+                 <div class="list-group-item list-group-item-action">
+                    <div class="d-flex w-100 justify-content-between">
+                        <p class="mb-1 small">{{ log.log_message }}</p>
+                        <small>{{ log.created_at|timesince }} ago</small>
+                    </div>
+                </div>
+            {% empty %}
+                <div class="list-group-item">No recent activity.</div>
+            {% endfor %}
+        </div>
+    </div>
+    <div class="modal-footer justify-content-center">
+        <a href="{% url 'project-inbox' project.id %}" class="btn btn-primary">Go to Full Inbox</a>
+    </div>
+</div>

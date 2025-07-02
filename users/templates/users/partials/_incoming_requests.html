@@ -1,0 +1,19 @@
+{% if total_incoming_requests_count > 0 %}
+<div class="card mb-4">
+    <div class="card-header">
+        Incoming Friend Requests
+        <span class="badge bg-danger rounded-pill">{{ total_incoming_requests_count }}</span>
+    </div>
+    <ul class="list-group list-group-flush">
+        {% for request in incoming_requests %}
+            <li class="list-group-item d-flex justify-content-between align-items-center">
+                <span>{{ request.from_user.username }}</span>
+                <div class="d-flex gap-2">
+                    <a href="{% url 'process-friend-request' request.id 'accept' %}" class="btn btn-sm btn-success">Accept</a>
+                    <a href="{% url 'process-friend-request' request.id 'decline' %}" class="btn btn-sm btn-danger">Decline</a>
+                </div>
+            </li>
+        {% endfor %}
+    </ul>
+</div>
+{% endif %}

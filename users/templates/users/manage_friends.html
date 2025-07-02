@@ -1,0 +1,149 @@
+{% extends 'projects/base.html' %}
+
+{% block content %}
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h1>Manage Friends</h1>
+        <a href="{% url 'dashboard' username=user.username %}" class="btn btn-secondary">Back to Dashboard</a>
+    </div>
+
+    <!-- Nav tabs -->
+    <ul class="nav nav-tabs" id="friendsTabs" role="tablist">
+        <li class="nav-item" role="presentation">
+            <button class="nav-link active" id="friends-list-tab" data-bs-toggle="tab" data-bs-target="#friends-list" type="button" role="tab">
+                Friends <span class="badge bg-secondary">{{ friends|length }}</span>
+            </button>
+        </li>
+        <li class="nav-item" role="presentation">
+            <button class="nav-link" id="requests-tab" data-bs-toggle="tab" data-bs-target="#requests" type="button" role="tab">
+                Incoming Requests <span class="badge bg-danger">{{ incoming_requests|length }}</span>
+            </button>
+        </li>
+        <li class="nav-item" role="presentation">
+            <button class="nav-link" id="pending-tab" data-bs-toggle="tab" data-bs-target="#pending" type="button" role="tab">
+                Sent Requests <span class="badge bg-info">{{ sent_requests|length }}</span>
+            </button>
+        </li>
+        <li class="nav-item" role="presentation">
+            <button class="nav-link" id="search-tab" data-bs-toggle="tab" data-bs-target="#search" type="button" role="tab">
+                Search Friends
+            </button>
+        </li>
+        <li class="nav-item" role="presentation">
+            <button class="nav-link" id="multi-domain-tab" data-bs-toggle="tab" data-bs-target="#multi-domain" type="button" role="tab">
+                Multi-Domain Friends
+            </button>
+        </li>
+    </ul>
+
+    <!-- Tab panes -->
+    <div class="tab-content pt-3">
+        <!-- Friends List Pane -->
+        <div class="tab-pane fade show active" id="friends-list" role="tabpanel">
+            <ul class="list-group">
+                {% for friend in friends %}
+                    <li class="list-group-item d-flex justify-content-between align-items-center">
+                        {{ friend.username }}
+                        <a href="{% url 'remove-friend' friend.id %}" class="btn btn-sm btn-outline-danger">Remove</a>
+                    </li>
+                {% empty %}
+                    <li class="list-group-item">You have no friends yet.</li>
+                {% endfor %}
+            </ul>
+        </div>
+        <!-- Incoming Requests Pane -->
+        <div class="tab-pane fade" id="requests" role="tabpanel">
+             <ul class="list-group">
+                {% for request in incoming_requests %}
+                    <li class="list-group-item d-flex justify-content-between align-items-center">
+                        <span>Friend request from <strong>{{ request.from_user.username }}</strong></span>
+                        <div class="d-flex gap-2">
+                            {# FIX: Add ?tab=requests to stay on this tab after action #}
+                            <a href="{% url 'process-friend-request' request.id 'accept' %}?tab=requests" class="btn btn-sm btn-success">Accept</a>
+                            <a href="{% url 'process-friend-request' request.id 'decline' %}?tab=requests" class="btn btn-sm btn-danger">Decline</a>
+                        </div>
+                    </li>
+                {% empty %}
+                    <li class="list-group-item">You have no incoming friend requests.</li>
+                {% endfor %}
+            </ul>
+        </div>
+        <!-- Sent Requests Pane -->
+        <div class="tab-pane fade" id="pending" role="tabpanel">
+            <ul class="list-group">
+                {% for request in sent_requests %}
+                    <li class="list-group-item d-flex justify-content-between align-items-center">
+                       <span>Friend request sent to <strong>{{ request.to_user.username }}</strong></span>
+                       {# FIX: Add cancel button #}
+                       <a href="{% url 'cancel-friend-request' request.id %}?tab=pending" class="btn btn-warning btn-sm">Cancel</a>
+                    </li>
+                {% empty %}
+                     <li class="list-group-item">You have no pending friend requests.</li>
+                {% endfor %}
+            </ul>
+        </div>
+        
+        <!-- Search Friends Pane -->
+        <div class="tab-pane fade" id="search" role="tabpanel">
+            <p class="text-muted">Search for other users on Chimera by their username.</p>
+            <form method="GET" action="{% url 'manage-friends' %}" class="mb-4">
+                <input type="hidden" name="tab" value="search">
+                <div class="input-group">
+                    <input type="text" name="q" class="form-control" placeholder="Enter username..." value="{{ query }}">
+                    <button class="btn btn-primary" type="submit">Search</button>
+                </div>
+            </form>
+            
+            {% if query %}
+                <hr>
+                <h3>Results for "{{ query }}"</h3>
+                {% if search_results %}
+                    <ul class="list-group">
+                        {% for result in search_results %}
+                            <li class="list-group-item d-flex justify-content-between align-items-center">
+                                {{ result.user.username }}
+
+                                {# FIX: Full logic for all possible states #}
+                                {% if result.status == 'friends' %}
+                                    <span class="badge bg-success">Already friends</span>
+                                {% elif result.status == 'pending_sent' %}
+                                    <a href="{% url 'cancel-friend-request' result.request_object.id %}?tab=search&q={{ query }}" class="btn btn-warning btn-sm">Pending (Cancel)</a>
+                                {% elif result.status == 'pending_received' %}
+                                    <a href="{% url 'manage-friends' %}?tab=requests" class="btn btn-info btn-sm">Request Received</a>
+                                {% else %}
+                                    <a href="{% url 'send-friend-request' result.user.id %}?q={{ query }}" class="btn btn-success btn-sm">Add Friend</a>
+                                {% endif %}
+                            </li>
+                        {% endfor %}
+                    </ul>
+                {% else %}
+                    <p>No new users found matching your query.</p>
+                {% endif %}
+            {% endif %}
+        </div>
+
+        <!-- Multi-Domain Pane -->
+        <div class="tab-pane fade" id="multi-domain" role="tabpanel">
+            <div class="card card-body text-center">
+                <p class="h4">Coming Soon!</p>
+                <p class="text-muted">This feature will allow you to connect with friends from other platforms like GitHub, Google, and more.</p>
+            </div>
+        </div>
+    </div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    // This script ensures the correct tab is active on page load if specified in the URL
+    document.addEventListener("DOMContentLoaded", function() {
+        const params = new URLSearchParams(window.location.search);
+        const tab = params.get('tab');
+        if (tab) {
+            const tabEl = document.querySelector('#' + tab + '-tab');
+            if(tabEl) {
+                const tab = new bootstrap.Tab(tabEl);
+                tab.show();
+            }
+        }
+    });
+</script>
+{% endblock %}

@@ -1,0 +1,20 @@
+{% if task.all_members_marked %}
+    <button class="dropdown-item" disabled>Everyone Marked</button>
+{% else %}
+    {% if task.is_completed %}
+        <button class="dropdown-item"
+                hx-get="{% url 'confirm-mark-task' task.id %}?assignee=all"
+                hx-target="#dialog"
+                data-bs-toggle="modal"
+                data-bs-target="#modal">
+            For All Members
+        </button>
+    {% else %}
+        <button class="dropdown-item"
+                hx-post="{% url 'mark-task-for-user' task.id %}"
+                hx-vals='{"assignee": "all"}'
+                hx-trigger="click">
+            For All Members
+        </button>
+    {% endif %}
+{% endif %}

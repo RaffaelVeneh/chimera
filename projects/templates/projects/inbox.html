@@ -1,0 +1,63 @@
+{% extends 'projects/base.html' %}
+
+{% block content %}
+    <nav aria-label="breadcrumb">
+        <ol class="breadcrumb">
+            <li class="breadcrumb-item"><a href="{% url 'project-list' %}">Projects</a></li>
+            <li class="breadcrumb-item"><a href="{% url 'project-detail' project.id %}">{{ project.title }}</a></li>
+            <li class="breadcrumb-item active" aria-current="page">Inbox</li>
+        </ol>
+    </nav>
+    
+    <h1>Project Inbox</h1>
+    <hr>
+
+    <ul class="nav nav-tabs" id="inboxTabs" role="tablist">
+        {% if role in 'owner,admin' %}
+            <li class="nav-item" role="presentation">
+                <button class="nav-link active" id="reports-tab" data-bs-toggle="tab" data-bs-target="#reports-pane" type="button" role="tab">
+                    Reports <span class="badge bg-danger">{{ reports.count }}</span>
+                </button>
+            </li>
+        {% endif %}
+        <li class="nav-item" role="presentation">
+            <button class="nav-link {% if role not in 'owner,admin' %}active{% endif %}" id="log-tab" data-bs-toggle="tab" data-bs-target="#log-pane" type="button" role="tab">
+                Activity Log
+            </button>
+        </li>
+    </ul>
+
+    <div class="tab-content" id="inboxTabsContent">
+        {% if role in 'owner,admin' %}
+            <div class="tab-pane fade show active" id="reports-pane" role="tabpanel">
+                <p class="text-muted small pt-2">Note: Only the last 25 reports are stored.</p>
+                <div class="list-group list-group-flush pt-3">
+                    {% for report in reports %}
+                        <div class="list-group-item">
+                            <h5 class="mb-1">Report on comment by "{{ report.reported_user.username }}"</h5>
+                            <small class="text-muted">Reported by {{ report.reporter.username }} on {{ report.reported_at|date:"M. d, Y" }}</small>
+                            <p class="mt-2"><strong>Reason:</strong> {{ report.reason|default:"No reason provided." }}</p>
+                            <blockquote class="blockquote-footer bg-light p-2 rounded">"{{ report.reported_comment.body|truncatechars:150 }}"</blockquote>
+                        </div>
+                    {% empty %}
+                        <div class="list-group-item">There are no reports for this project.</div>
+                    {% endfor %}
+                </div>
+            </div>
+        {% endif %}
+
+        <div class="tab-pane fade {% if role not in 'owner,admin' %}show active{% endif %}" id="log-pane" role="tabpanel">
+            <p class="text-muted small pt-2">Note: Only the last 50 activity logs are stored.</p>
+            <div class="list-group list-group-flush pt-3">
+                {% for log in logs %}
+                    <div class="list-group-item">
+                        <p class="mb-1">{{ log.log_message }}</p>
+                        <small class="text-muted">{{ log.created_at|timesince }} ago</small>
+                    </div>
+                {% empty %}
+                    <div class="list-group-item">There is no activity to show yet.</div>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+{% endblock %}

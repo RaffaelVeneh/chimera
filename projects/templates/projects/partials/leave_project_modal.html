@@ -1,0 +1,15 @@
+<div class="modal-content">
+    <div class="modal-header"><h5 class="modal-title">Leave Project</h5></div>
+    <div class="modal-body">
+        <p>Are you sure you want to leave the project "<strong>{{ project.title }}</strong>"?</p>
+        <p class="text-muted">You will lose access to all its content and will need to request access to re-join.</p>
+    </div>
+    <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+        <button type="button" class="btn btn-danger"
+                hx-post="{% url 'leave-project' project.id %}"
+                data-bs-dismiss="modal">
+            Yes, Leave Project
+        </button>
+    </div>
+</div>

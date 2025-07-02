@@ -1,0 +1,7 @@
+<button class="dropdown-item" hx-post="{% url 'toggle-pin-task' task.id %}">
+    {% if user in task.pinned_by.all %}
+        Unpin for Myself
+    {% else %}
+        Pin for Myself
+    {% endif %}
+</button>

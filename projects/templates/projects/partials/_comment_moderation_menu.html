@@ -1,0 +1,12 @@
+{# This is the "slide-out" moderation menu #}
+<li>
+    <a class="dropdown-item" href="#"
+       hx-get="{% url 'comment-main-menu' comment.id %}"
+       hx-target="closest ul"
+       hx-swap="innerHTML">
+        &laquo; Back
+    </a>
+</li>
+<li><hr class="dropdown-divider"></li>
+<li><button class="dropdown-item" hx-get="{% url 'kick-user' comment.membership.id %}" ...>Kick {{ comment.author.username }}</button></li>
+<li><button class="dropdown-item text-danger" hx-get="{% url 'kick-and-ban-user' comment.membership.id %}" ...>Kick & Ban {{ comment.author.username }}</button></li>

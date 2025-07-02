@@ -1,0 +1,23 @@
+<ul class="list-group">
+    {% for ban in banned_list %}
+    <li class="list-group-item d-flex justify-content-between align-items-center">
+        <span>
+            <strong>{{ ban.user.username }}</strong>
+            <small class="text-muted d-block">Was a '{{ ban.get_role_display }}' - Banned on {{ ban.banned_at|date:"M. d, Y" }}</small>
+        </span>
+        
+        {% if ban.can_unban %}
+            <button type="button" class="btn btn-sm btn-outline-success"
+                    {# --- FIX: Point hx-get to the new modal URL --- #}
+                    hx-get="{% url 'unban-user-modal' ban.id %}"
+                    data-bs-toggle="modal"
+                    data-bs-target="#modal"
+                    hx-target="#dialog">
+                Unban
+            </button>
+        {% endif %}
+    </li>
+    {% empty %}
+        <li class="list-group-item">No users are banned from this project.</li>
+    {% endfor %}
+</ul>

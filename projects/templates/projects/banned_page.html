@@ -1,0 +1,14 @@
+{% extends 'projects/base.html' %}
+
+{% block content %}
+    <div class="text-center py-5">
+        <h1 class="display-1">🛑</h1>
+        <h2 class="display-4">Access Restricted</h2>
+        <p class="lead mt-4">
+            You have been banned from the project "<strong>{{ project.title }}</strong>".
+        </p>
+        <p>If you believe this is a mistake, please contact the project owner directly.</p>
+        <hr class="my-4">
+        <a class="btn btn-primary" href="{% url 'project-list' %}" role="button">Go to Project Dashboard</a>
+    </div>
+{% endblock %}

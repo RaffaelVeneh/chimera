@@ -32,6 +32,7 @@ urlpatterns = [    path('admin/', admin.site.urls),
 
     path('projects/', include('projects.urls')),
     path('papers/', include('knowledge_hub.urls')),
+    path('friends/', include('users.urls')),
 ]
 
 if settings.DEBUG:

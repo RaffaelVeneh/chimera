@@ -86,21 +86,22 @@ class ProjectFile(models.Model):
         return self.file.name
     
 class ProjectMembership(models.Model):
-    class Role(models.TextChoices):
-        VIEWER = 'viewer', 'Viewer'
-        EDITOR = 'editor', 'Editor'
-        ADMIN = 'admin', 'Admin'
+    ROLE_CHOICES = [
+        ('admin', 'Admin'),
+        ('editor', 'Editor'),
+        ('viewer', 'Viewer'),
+    ]
 
     project = models.ForeignKey(Project, on_delete=models.CASCADE)
     user = models.ForeignKey(User, on_delete=models.CASCADE)
-    role = models.CharField(max_length=10, choices=Role.choices, default=Role.VIEWER)
+    
+    role = models.CharField(max_length=20, choices=ROLE_CHOICES)
 
     class Meta:
-        # Ensure a user can only have one role per project
         unique_together = ('project', 'user')
 
     def __str__(self):
-        return f'{self.user.username} is a {self.get_role_display()} on {self.project.title}'
+        return f'{self.user.username} - {self.project.title} ({self.role})'
     
 class AccessRequest(models.Model):
     class Status(models.TextChoices):
@@ -128,3 +129,58 @@ class PersonalTodo(models.Model):
 
     def __str__(self):
         return self.title
+    
+class Ban(models.Model):
+    project = models.ForeignKey(Project, on_delete=models.CASCADE, related_name='bans')
+    user = models.ForeignKey(User, on_delete=models.CASCADE)
+    banned_by = models.ForeignKey(User, on_delete=models.CASCADE, related_name='issued_bans')
+    banned_at = models.DateTimeField(auto_now_add=True)
+    reason = models.TextField(blank=True)
+
+    role = models.CharField(max_length=20, default='viewer')
+
+    def __str__(self):
+        return f'{self.user.username} banned from {self.project.title}'
+    
+class Report(models.Model):
+    """Represents a report made by a user against a specific comment."""
+    class Status(models.TextChoices):
+        OPEN = 'open', 'Open'
+        RESOLVED = 'resolved', 'Resolved'
+        DISMISSED = 'dismissed', 'Dismissed'
+
+    # The comment that was reported
+    reported_comment = models.ForeignKey(Comment, on_delete=models.CASCADE, related_name='reports')
+    # The user who filed the report
+    reporter = models.ForeignKey(User, on_delete=models.CASCADE, related_name='filed_reports')
+    # The user who was reported
+    reported_user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='received_reports')
+    
+    # Details of the report
+    reason = models.TextField(blank=True)
+    status = models.CharField(max_length=10, choices=Status.choices, default=Status.OPEN)
+    reported_at = models.DateTimeField(auto_now_add=True)
+    
+    # For resolution tracking
+    resolved_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='resolved_reports')
+    resolved_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        ordering = ['-reported_at']
+
+    def __str__(self):
+        return f'Report by {self.reporter.username} on comment {self.reported_comment.id}'
+    
+class ProjectLog(models.Model):
+    """Represents a single log entry for an important event in a project."""
+    project = models.ForeignKey(Project, on_delete=models.CASCADE, related_name='logs')
+    # The user who performed the action
+    user = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, related_name='actions_logged')
+    log_message = models.TextField()
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return f'Log for {self.project.title} at {self.created_at}'

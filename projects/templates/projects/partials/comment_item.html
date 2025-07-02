@@ -16,30 +16,37 @@
             <p class="card-text">{{ comment.body }}</p>
             <div class="dropdown">
                 <button class="btn btn-sm btn-light" type="button" data-bs-toggle="dropdown" aria-expanded="false">&#8942;</button>
-                <ul class="dropdown-menu">
+                <ul class="dropdown-menu dropdown-menu-end">
                     {% if comment.author == user %}
-                    <li>
-                        <button class="dropdown-item"
-                                hx-get="{% url 'edit-comment' comment.id %}"
-                                hx-target="#comment-{{ comment.id }} .card-body" hx-swap="innerHTML">
-                            Edit
-                        </button>
-                    </li>
+                        <li><button class="dropdown-item" hx-get="{% url 'edit-comment' comment.id %}" hx-target="#comment-{{ comment.id }} .card-body" hx-swap="innerHTML">Edit</button></li>
+                    {% endif %}
+
+                    {% if comment.can_be_reported %}
+                        <li><button class="dropdown-item text-warning" hx-get="{% url 'report-comment' comment.id %}" data-bs-toggle="modal" data-bs-target="#modal" hx-target="#dialog">Report</button></li>
+                    {% endif %}
+
+                    {% if comment.can_be_deleted %}
+                        <li><button class="dropdown-item text-danger" hx-get="{% url 'delete-comment' comment.id %}" data-bs-toggle="modal" data-bs-target="#modal" hx-target="#dialog">Delete Comment</button></li>
                     {% endif %}
                     
-                    {% if comment.author == user or role == 'owner' or role == 'admin' %}
-                    <li>
-                        <button class="dropdown-item text-danger"
-                                hx-get="{% url 'delete-comment' comment.id %}"
-                                hx-target="#dialog"
-                                data-bs-toggle="modal"
-                                data-bs-target="#modal">
-                            Delete
-                        </button>
-                    </li>
+                    {% if comment.can_be_moderated %}
+                        <li><hr class="dropdown-divider"></li>
+                        <li><h6 class="dropdown-header">Moderation</h6></li>
+                        <li>
+                            <button class="dropdown-item"
+                                    hx-get="{% url 'kick-user' comment.membership.id %}"
+                                    data-bs-toggle="modal" data-bs-target="#modal" hx-target="#dialog">
+                                Kick {{ comment.author.username }}
+                            </button>
+                        </li>
+                        <li>
+                            <button class="dropdown-item text-danger"
+                                    hx-get="{% url 'kick-and-ban-user' comment.membership.id %}"
+                                    data-bs-toggle="modal" data-bs-target="#modal" hx-target="#dialog">
+                                Kick & Ban {{ comment.author.username }}
+                            </button>
+                        </li>
                     {% endif %}
-                    
-                    <li><a class="dropdown-item" href="#">Report (coming soon)</a></li>
                 </ul>
             </div>
         </div>

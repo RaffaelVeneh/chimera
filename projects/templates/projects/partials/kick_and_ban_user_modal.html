@@ -1,0 +1,15 @@
+<div class="modal-content">
+    <div class="modal-header"><h5 class="modal-title">Confirm Kick & Ban</h5></div>
+    <div class="modal-body">
+        <p>Are you sure you want to kick and <strong>permanently ban</strong> <strong>{{ membership.user.username }}</strong>?</p>
+        <p class="text-danger">They will be removed from the project and will NOT be able to re-join.</p>
+    </div>
+    <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+        <button type="button" class="btn btn-danger"
+                hx-post="{% url 'kick-and-ban-user' membership.id %}"
+                data-bs-dismiss="modal">
+            Yes, Kick & Ban
+        </button>
+    </div>
+</div>

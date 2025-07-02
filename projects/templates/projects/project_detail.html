@@ -5,10 +5,36 @@
     <div hx-post="{% url 'mark-project-read' project.id %}" hx-trigger="load"></div>
     <div class="d-flex justify-content-between align-items-center">
         <h1>{{ project.title }}</h1>
-        {% if project.owner == user %}
-            <a href="{% url 'edit-project' project.id %}" class="btn btn-secondary">Edit this project</a>
-            <a href="{% url 'manage-collaborators' project.id %}" class="btn btn-info">Manage Collaborators</a>
-        {% endif %}
+        <div class="d-flex gap-2">
+            {% if role %}
+                {# --- FIX: Use aspect-ratio for a responsive square button --- #}
+                <button class="btn btn-outline-dark d-flex align-items-center justify-content-center"
+                        style="aspect-ratio: 1;"
+                        hx-get="{% url 'project-inbox-preview' project.id %}"
+                        data-bs-toggle="modal"
+                        data-bs-target="#modal"
+                        hx-target="#dialog"
+                        title="Project Inbox">
+                    <i class="fa-solid fa-envelope"></i>
+                </button>
+            {% endif %}
+
+            {% if project.owner == user %}
+                <a href="{% url 'edit-project' project.id %}" class="btn btn-secondary">Edit Project Settings</a>
+            {% else %}
+                <button class="btn btn-danger"
+                        hx-get="{% url 'leave-project' project.id %}"
+                        data-bs-toggle="modal"
+                        data-bs-target="#modal"
+                        hx-target="#dialog">
+                    Leave Project
+                </button>
+            {% endif %}
+
+            {% if role %}
+                <a href="{% url 'manage-collaborators' project.id %}" class="btn btn-info">Manage Team</a>
+            {% endif %}
+        </div>
     </div>
     <hr>
 
@@ -55,7 +81,6 @@
     <div class="mt-5">
         <div class="d-flex justify-content-between align-items-center">
             <h2>Project Files</h2>
-            <!-- 1. The "Upload File" button that controls the collapse -->
             {% if role in 'owner,admin,editor' %}
                 <button class="btn btn-primary" type="button" data-bs-toggle="collapse" data-bs-target="#upload-form-collapse" aria-expanded="false" aria-controls="upload-form-collapse">
                     Upload Files
@@ -64,7 +89,6 @@
         </div>
         <hr>
 
-        <!-- 2. The Collapsible form area -->
         <div class="collapse mb-4" id="upload-form-collapse">
             <div class="card card-body">
                 <form action="{% url 'add-file' project.id %}" class="dropzone" id="file-dropzone">
@@ -74,7 +98,6 @@
             </div>
         </div>
 
-        <!-- 3. The File List (shows top 5, as before) -->
         <ul class="list-group">
         {% for file in project.files.all|slice:":5" %}
             <li class="list-group-item d-flex justify-content-between align-items-center">

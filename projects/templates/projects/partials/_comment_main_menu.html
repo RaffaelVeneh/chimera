@@ -1,0 +1,22 @@
+{# This is the initial, main menu content #}
+{% if comment.author == user %}
+    <li><button class="dropdown-item" hx-get="{% url 'edit-comment' comment.id %}" ...>Edit</button></li>
+{% endif %}
+{% if comment.can_be_reported %}
+    <li><button class="dropdown-item text-warning" hx-get="{% url 'report-comment' comment.id %}" ...>Report</button></li>
+{% endif %}
+{% if comment.can_be_deleted %}
+    <li><hr class="dropdown-divider"></li>
+    <li><button class="dropdown-item text-danger" hx-get="{% url 'delete-comment' comment.id %}" ...>Delete Comment</button></li>
+{% endif %}
+{% if comment.can_be_moderated %}
+    <li><hr class="dropdown-divider"></li>
+    <li>
+        <a class="dropdown-item" href="#"
+           hx-get="{% url 'comment-moderation-menu' comment.id %}"
+           hx-target="closest ul"
+           hx-swap="innerHTML">
+            More Options &raquo;
+        </a>
+    </li>
+{% endif %}

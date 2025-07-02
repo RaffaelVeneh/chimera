@@ -1,0 +1,15 @@
+<div class="modal-content">
+    <div class="modal-header"><h5 class="modal-title">Confirm Kick</h5></div>
+    <div class="modal-body">
+        <p>Are you sure you want to kick <strong>{{ membership.user.username }}</strong> from the project?</p>
+        <p class="text-muted">They will be removed from the project but will be able to request access to re-join later.</p>
+    </div>
+    <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+        <button type="button" class="btn btn-warning"
+                hx-post="{% url 'kick-user' membership.id %}"
+                data-bs-dismiss="modal">
+            Yes, Kick User
+        </button>
+    </div>
+</div>

@@ -1,5 +1,5 @@
 from django.contrib import admin
-from .models import Project, Task, Comment, ProjectMembership, AccessRequest
+from .models import Project, Task, Comment, ProjectMembership, AccessRequest, Ban, Report, ProjectLog
 
 class ProjectMembershipInline(admin.TabularInline):
     model = ProjectMembership
@@ -18,3 +18,6 @@ class ProjectAdmin(admin.ModelAdmin):
 admin.site.register(Task)
 admin.site.register(Comment)
 admin.site.register(AccessRequest)
+admin.site.register(Ban)
+admin.site.register(Report)
+admin.site.register(ProjectLog)

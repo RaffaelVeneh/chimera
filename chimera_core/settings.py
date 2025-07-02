@@ -13,6 +13,7 @@ import os
 import dj_database_url 
 from pathlib import Path
 from decouple import config
+from django.contrib.messages import constants as messages
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -42,6 +43,7 @@ INSTALLED_APPS = [
     
     'projects',
     'knowledge_hub',
+    'users',
     
     'django_htmx',
     'crispy_forms',
@@ -157,3 +159,11 @@ ACCOUNT_SIGNUP_FIELDS = ['username*', 'email*', 'password1*', 'password2*']
 
 LOGIN_REDIRECT_URL = '/dashboard/projects/'
 LOGOUT_REDIRECT_URL = '/dashboard/projects/'
+
+MESSAGE_TAGS = {
+    messages.DEBUG: 'secondary',
+    messages.INFO: 'info',
+    messages.SUCCESS: 'success',
+    messages.WARNING: 'warning',
+    messages.ERROR: 'danger',
+}

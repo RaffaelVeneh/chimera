@@ -1,4 +1,4 @@
-<form hx-post="{% url 'edit-task' task.id %}" hx-target="this" hx-swap="outerHTML">
+<form hx-post="{% url 'edit-task' task.id %}">
     {% csrf_token %}
     <div class="input-group">
         <input type="text" class="form-control" name="title" value="{{ form.title.value }}">
