@@ -1,0 +1,20 @@
+{% if invitation %}
+    {# Form for canceling an invitation #}
+    <form hx-post="{% url 'cancel-invitation' invitation.id %}" hx-target="#management-section" hx-swap="innerHTML">
+        {% csrf_token %}
+        <button type="submit" class="btn btn-sm btn-warning">Invited (Cancel)</button>
+    </form>
+{% else %}
+    {# Form for sending an invitation #}
+    <form hx-post="{% url 'send-invitation' project.id user_to_invite.id %}" hx-target="#management-section" hx-swap="innerHTML">
+        {% csrf_token %}
+        <div class="d-flex gap-2">
+            <select name="role" class="form-select form-select-sm" style="width: 100px;">
+                {% if role == 'owner' %}<option value="admin">Admin</option>{% endif %}
+                <option value="editor">Editor</option>
+                <option value="viewer" selected>Viewer</option>
+            </select>
+            <button type="submit" class="btn btn-sm btn-success">Invite</button>
+        </div>
+    </form>
+{% endif %}

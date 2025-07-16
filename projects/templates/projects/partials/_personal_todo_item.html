@@ -1,0 +1,34 @@
+{% load project_extras %}
+
+<li class="list-group-item {% if not todo.is_completed and todo.due_date and todo.due_date < now %}bg-danger-subtle{% endif %}" id="todo-item-{{ todo.id }}">
+    <div class="d-flex justify-content-between align-items-center">
+        <div class="form-check">
+            <input class="form-check-input" type="checkbox" 
+                   hx-post="{% url 'toggle-personal-todo' todo.id %}" 
+                   hx-target="#todo-list-content-wrapper" {# <-- FIX #}
+                   hx-swap="innerHTML"
+                   id="todo-check-{{ todo.id }}"
+                   {% if todo.is_completed %}checked{% endif %}>
+            <label class="form-check-label {% if todo.is_completed %}text-decoration-line-through text-muted{% endif %}" for="todo-check-{{ todo.id }}">
+                {{ todo.title }}
+            </label>
+        </div>
+        <div class="d-flex align-items-center gap-2">
+            {% if todo.priority == 'high' %}
+                <span class="badge bg-danger">High</span>
+            {% elif todo.priority == 'medium' %}
+                <span class="badge bg-warning text-dark">Medium</span>
+            {% else %}
+                <span class="badge bg-success">Low</span>
+            {% endif %}
+            <button class="btn btn-sm btn-outline-secondary" hx-get="{% url 'get-edit-todo-form' todo.id %}" hx-target="#todo-item-{{ todo.id }}" hx-swap="outerHTML">
+                Edit
+            </button>
+        </div>
+    </div>
+    {% if todo.due_date %}
+    <div class="text-muted small mt-1 ps-4">
+        <small>{{ todo.due_date|due_status }} ({{ todo.due_date|date:"M. d, g:i a" }})</small>
+    </div>
+    {% endif %}
+</li>

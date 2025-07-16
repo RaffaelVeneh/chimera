@@ -1,0 +1,19 @@
+<ul class="list-group list-group-flush" id="todo-items-list" style="max-height: 250px; overflow-y: auto;">
+    {% for todo in todos %}
+        {% include 'projects/partials/_personal_todo_item.html' with todo=todo now=now %}
+    {% empty %}
+        <li class="list-group-item text-muted text-center" id="empty-todo-message">No personal to-dos yet.</li>
+    {% endfor %}
+</ul>
+
+{% if has_completed_tasks %}
+<div class="card-footer text-end">
+    <button class="btn btn-sm btn-outline-danger"
+            hx-post="{% url 'delete-completed-todos' %}"
+            hx-target="#todo-list-content-wrapper"
+            hx-swap="innerHTML"
+            hx-confirm="Are you sure you want to delete all finished tasks?">
+        Clear All Finished
+    </button>
+</div>
+{% endif %}

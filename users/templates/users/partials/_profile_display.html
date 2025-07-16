@@ -1,0 +1,69 @@
+{% load user_extras %}
+<div class="card">
+    <div class="card-header d-flex justify-content-between align-items-center">
+        <h4>About Me</h4>
+        {# Button to load the edit form #}
+        <button class="btn btn-sm btn-secondary" 
+                hx-get="{% url 'get-profile-edit-form' public_id=profile.public_id %}" 
+                hx-target="#profile-details-container" 
+                hx-swap="innerHTML">
+            Edit Profile
+        </button>
+    </div>
+    <div class="card-body">
+        <dl class="row">
+            <dt class="col-sm-3">Username</dt>
+            <dd class="col-sm-9">
+                {{ profile.user.username }}
+                {# Link to switch to the account settings tab #}
+                <a href="#" 
+                   data-bs-toggle="tab" 
+                   data-bs-target="#settings-pane" 
+                   class="small text-muted ms-2">(Change?)</a>
+            </dd>
+
+            <dt class="col-sm-3">Full Name</dt>
+            <dd class="col-sm-9">{{ profile.name|default:"Not specified." }}</dd>
+            
+            <dt class="col-sm-3">Headline</dt>
+            <dd class="col-sm-9">{{ profile.headline|default:"Not specified." }}</dd>
+
+            <dt class="col-sm-3">Institution</dt>
+            <dd class="col-sm-9">{{ profile.institution|default:"Not specified." }}</dd>
+
+            <dt class="col-sm-3">Website</dt>
+            <dd class="col-sm-9">
+                {% if profile.website_url %}
+                    <a href="{{ profile.website_url }}" target="_blank">{{ profile.website_url }}</a>
+                {% else %}
+                    Not specified.
+                {% endif %}
+            </dd>
+
+            <dt class="col-sm-3">Research Interests</dt>
+            <dd class="col-sm-9">
+                {% for interest in profile.research_interests|split %}
+                    {% if interest|strip %}
+                        <span class="badge rounded-pill bg-primary fw-normal">{{ interest|strip }}</span>
+                    {% endif %}
+                {% empty %}
+                    <span class="text-muted">Not specified.</span>
+                {% endfor %}
+            </dd>
+
+            <dt class="col-sm-3">Skills</dt>
+            <dd class="col-sm-9">
+                {% for skill in profile.skills|split %}
+                    {% if skill|strip %}
+                        <span class="badge rounded-pill bg-secondary fw-normal">{{ skill|strip }}</span>
+                    {% endif %}
+                {% empty %}
+                    <span class="text-muted">Not specified.</span>
+                {% endfor %}
+            </dd>
+        </dl>
+        <hr>
+        <h6>Bio</h6>
+        <p>{{ profile.bio|default:"No biography provided."|linebreaksbr }}</p>
+    </div>
+</div>

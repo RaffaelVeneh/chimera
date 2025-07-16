@@ -1,0 +1,7 @@
+<div id="todo-list-content-wrapper" hx-swap-oob="true">
+    {% include 'projects/partials/_personal_todo_list_content.html' with todos=todos now=now has_completed_tasks=has_completed_tasks %}
+</div>
+
+{# This block will replace the add form container, effectively clearing it #}
+<div id="add-todo-form-container" hx-swap-oob="true">
+</div>

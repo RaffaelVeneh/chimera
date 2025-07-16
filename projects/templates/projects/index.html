@@ -24,10 +24,16 @@
         <li class="nav-item" role="presentation">
             <button class="nav-link {% if active_tab == 'owned' %}active{% endif %}" id="owned-tab" data-bs-toggle="tab" data-bs-target="#owned-projects" type="button" role="tab" aria-controls="owned-projects" aria-selected="false">My Projects</button>
         </li>
+        {% if user.is_authenticated %}
+        <li class="nav-item" role="presentation">
+            <button class="nav-link {% if active_tab == 'invitations' %}active{% endif %}" id="invitations-tab" data-bs-toggle="tab" data-bs-target="#invitations-pane" type="button">
+                Project Invitations <span class="badge bg-primary rounded-pill">{{ invitations.count }}</span>
+            </button>
+        </li>
+        {% endif %}
     </ul>
 
     <div class="tab-content" id="projectTabsContent">
-
         <div class="tab-pane fade {% if active_tab == 'public' %}show active{% endif %}" id="public-projects" role="tabpanel">
             <div class="list-group list-group-flush pt-3">
                 {% for project in public_projects %}
@@ -75,6 +81,57 @@
                 </div>
             {% endif %}
         </div>
+
+        {% if user.is_authenticated %}
+        <div class="tab-pane fade {% if active_tab == 'invitations' %}show active{% endif %}" id="invitations-pane" role="tabpanel">
+            <div class="list-group list-group-flush pt-3">
+                {% for inv in invitations %}
+                    <div class="list-group-item d-flex justify-content-between align-items-center">
+                        <div>
+                            You have been invited to join <strong>{{ inv.project.title }}</strong> by <strong>{{ inv.inviter.username }}</strong>.
+                        </div>
+                        <div class="d-flex gap-2">
+                            <form action="{% url 'accept-invitation' inv.id %}" method="post">
+                                {% csrf_token %}
+                                <button type="submit" class="btn btn-sm btn-success">Accept</button>
+                            </form>
+                            <form action="{% url 'decline-invitation' inv.id %}" method="post">
+                                {% csrf_token %}
+                                <button type="submit" class="btn btn-sm btn-danger">Decline</button>
+                            </form>
+                        </div>
+                    </div>
+                {% empty %}
+                    <div class="text-center p-5 card"><h4>You have no pending project invitations.</h4></div>
+                {% endfor %}
+            </div>
+        </div>
+        {% endif %}
     </div>
-    
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const tabButtons = document.querySelectorAll('#projectTabs button[data-bs-toggle="tab"]');
+    const storageKey = 'projectDashboardLastTab';
+
+    // Add a click listener to each tab button to save its target
+    tabButtons.forEach(button => {
+        button.addEventListener('shown.bs.tab', function (event) {
+            localStorage.setItem(storageKey, event.target.dataset.bsTarget);
+        });
+    });
+
+    // On page load, check for a saved tab and activate it
+    const lastTabId = localStorage.getItem(storageKey);
+    if (lastTabId) {
+        const lastTabButton = document.querySelector(`button[data-bs-target="${lastTabId}"]`);
+        if (lastTabButton) {
+            const tab = new bootstrap.Tab(lastTabButton);
+            tab.show();
+        }
+    }
+});
+</script>
 {% endblock %}

@@ -121,15 +121,6 @@ class AccessRequest(models.Model):
     def __str__(self):
         return f'{self.user.username} request for {self.project.title}'
     
-class PersonalTodo(models.Model):
-    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='todos')
-    title = models.CharField(max_length=200)
-    is_completed = models.BooleanField(default=False)
-    created_at = models.DateTimeField(auto_now_add=True)
-
-    def __str__(self):
-        return self.title
-    
 class Ban(models.Model):
     project = models.ForeignKey(Project, on_delete=models.CASCADE, related_name='bans')
     user = models.ForeignKey(User, on_delete=models.CASCADE)
@@ -184,3 +175,53 @@ class ProjectLog(models.Model):
 
     def __str__(self):
         return f'Log for {self.project.title} at {self.created_at}'
+    
+class ProjectInvitation(models.Model):
+    """
+    Represents an invitation for a user to join a project.
+    """
+    STATUS_CHOICES = (
+        ('pending', 'Pending'),
+        ('accepted', 'Accepted'),
+        ('declined', 'Declined'),
+    )
+
+    project = models.ForeignKey(Project, on_delete=models.CASCADE, related_name='invitations')
+    # The user who sent the invitation (owner or admin)
+    inviter = models.ForeignKey(User, on_delete=models.CASCADE, related_name='sent_invitations')
+    # The user who received the invitation
+    invitee = models.ForeignKey(User, on_delete=models.CASCADE, related_name='received_invitations')
+    
+    role = models.CharField(max_length=20, choices=ProjectMembership.ROLE_CHOICES, default='viewer')
+    status = models.CharField(max_length=10, choices=STATUS_CHOICES, default='pending')
+    
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        # A user can only have one pending invitation for a specific project
+        unique_together = ('project', 'invitee')
+
+    def __str__(self):
+        return f"Invitation for {self.invitee.username} to join {self.project.title}"
+    
+class PersonalTodo(models.Model):
+    PRIORITY_CHOICES = [
+        ('low', 'Low'),
+        ('medium', 'Medium'),
+        ('high', 'High'),
+    ]
+
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='personal_todos')
+    title = models.CharField(max_length=255)
+    is_completed = models.BooleanField(default=False)
+    created_at = models.DateTimeField(auto_now_add=True)
+    
+    # --- ADD THESE FIELDS ---
+    due_date = models.DateTimeField(null=True, blank=True)
+    priority = models.CharField(max_length=10, choices=PRIORITY_CHOICES, default='medium')
+
+    class Meta:
+        ordering = ['is_completed', 'due_date'] # Order by completion status, then due date
+
+    def __str__(self):
+        return self.title

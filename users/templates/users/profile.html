@@ -1,0 +1,455 @@
+{% extends 'projects/base.html' %}
+{% load crispy_forms_tags %}
+
+{% block content %}
+<style>
+    /* General style for the edit buttons */
+    .edit-icon-wrapper {
+        position: absolute;
+        top: 10px;
+        right: 10px;
+        width: 36px;
+        height: 36px;
+        background-color: rgba(255, 255, 255, 0.8);
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        text-decoration: none;
+        border: 1px solid #dee2e6;
+        color: #212529;
+        transition: all 0.2s ease-in-out;
+        cursor: pointer;
+    }
+    .edit-icon-wrapper:hover {
+        background-color: white;
+        transform: scale(1.1);
+    }
+
+    .profile-card-desktop {
+        overflow: visible;
+    }
+    .profile-banner-container {
+        position: relative;
+    }
+    .profile-banner-img {
+        display: block;
+        object-fit: cover;
+        height: 160px;
+        width: 100%;
+        aspect-ratio: 16 / 6;
+        border-top-left-radius: var(--bs-card-inner-border-radius);
+        border-top-right-radius: var(--bs-card-inner-border-radius);
+    }
+    .profile-picture-container {
+        position: relative;
+        margin-left: auto;
+        margin-right: auto;
+        /* Smaller profile picture for mobile */
+        width: 120px;
+        height: 120px;
+        margin-top: -60px; /* (half of height) */
+    }
+    .profile-picture-img-desktop {
+        width: 100%;
+        height: 100%;
+        border-radius: 50%;
+        border: 3px solid white;
+        object-fit: cover;
+    }
+    .profile-picture-overlay {
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        border-radius: 50%;
+        background-color: rgba(0, 0, 0, 0.4);
+        color: white;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 1.75rem; /* Slightly smaller icon for mobile */
+        opacity: 0;
+        transition: opacity 0.2s ease-in-out;
+        cursor: pointer;
+    }
+    .profile-picture-container:hover .profile-picture-overlay {
+        opacity: 1;
+    }
+
+    /* Desktop-specific styles */
+    @media (min-width: 992px) {
+        .profile-card-desktop {
+            overflow: visible;
+        }
+
+        .profile-banner-container {
+            position: relative;
+        }
+
+        .profile-banner-img {
+            display: block;
+            width: 100%;
+            height: 185px;
+            object-fit: cover;
+            border-top-left-radius: var(--bs-card-inner-border-radius);
+            border-top-right-radius: var(--bs-card-inner-border-radius);
+        }
+
+        .profile-picture-container {
+            position: relative;
+            margin-top: -75px;
+            width: 150px;
+            height: 150px;
+            margin-left: auto;
+            margin-right: auto;
+        }
+
+        .profile-picture-img-desktop {
+            width: 100%;
+            height: 100%;
+            border-radius: 50%;
+            border: 4px solid white;
+            object-fit: cover;
+        }
+
+        .profile-picture-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            border-radius: 50%;
+            background-color: rgba(0, 0, 0, 0.4);
+            color: white;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 2rem;
+            opacity: 0;
+            transition: opacity 0.2s ease-in-out;
+            cursor: pointer;
+        }
+
+        .profile-picture-container:hover .profile-picture-overlay {
+            opacity: 1;
+        }
+    }
+
+    /* Mobile-specific styles */
+    .mobile-profile-picture-container {
+        position: relative;
+    }
+
+    /* Cropper.js preview style */
+    .img-container {
+        width: 100%;
+        height: 400px;
+        background-color: #f7f7f7;
+    }
+
+    @media (max-width: 767px) {
+        .cropper-point {
+            width: 20px;
+            height: 20px;
+            opacity: 0.9;
+        }
+        .cropper-point.point-se {
+            /* Make the bottom-right handle slightly bigger for easier resizing */
+            width: 30px;
+            height: 30px;
+        }
+    }
+</style>
+
+<div class="row">
+    <div class="col-lg-4 mb-4">
+        <div>
+            <div class="card sticky-top profile-card-desktop" style="top: 1rem;">
+                <div class="profile-banner-container">
+                    <img src="{{ profile.banner_picture.url }}" class="profile-banner-img" alt="Banner">
+                    <a class="edit-icon-wrapper" title="Edit banner" data-bs-toggle="modal" data-bs-target="#cropBannerModal">
+                        <i class="fa-solid fa-pen"></i>
+                    </a>
+                </div>
+
+                <div class="profile-picture-container">
+                    <img src="{{ profile.profile_picture.url }}" class="profile-picture-img-desktop" alt="{{ profile.name|default:profile.user.username }}'s profile picture">
+                    <div class="profile-picture-overlay" title="Edit profile picture" data-bs-toggle="modal" data-bs-target="#cropImageModal">
+                        <i class="fa-solid fa-camera"></i>
+                    </div>
+                </div>
+                
+                <div class="card-body text-center pt-2">
+                    <h5 class="card-title">{{ profile.name|default:profile.user.username }}</h5>
+                    <p class="card-text text-muted">{{ profile.headline|default:"No headline provided." }}</p>
+                    <hr>
+                    <p class="card-text"><strong>Institution:</strong> {{ profile.institution|default:"Not specified." }}</p>
+                    {% if profile.website_url %}
+                        <a href="{{ profile.website_url }}" class="btn btn-outline-primary btn-sm" target="_blank">Visit Website</a>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="col">
+        <ul class="nav nav-tabs" id="profileTabs" role="tablist">
+            <li class="nav-item" role="presentation">
+                <button class="nav-link active" id="profile-tab" data-bs-toggle="tab" data-bs-target="#profile-pane" type="button">Profile</button>
+            </li>
+            {% if is_own_profile %}
+            <li class="nav-item" role="presentation">
+                <button class="nav-link" id="settings-tab" data-bs-toggle="tab" data-bs-target="#settings-pane" type="button">Account Settings</button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link" id="connections-tab" data-bs-toggle="tab" data-bs-target="#connections-pane" type="button">Connections</button>
+            </li>
+            {% endif %}
+        </ul>
+
+        <div class="tab-content pt-3">
+            <div class="tab-pane fade show active" id="profile-pane" role="tabpanel">
+                <div id="profile-details-container">
+                    {% include 'users/partials/_profile_display.html' %}
+                </div>
+            </div>
+
+            {% if is_own_profile %}
+            <div class="tab-pane fade" id="settings-pane" role="tabpanel">
+                {% include 'users/partials/_account_settings.html' %}
+            </div>
+
+            <div class="tab-pane fade" id="connections-pane" role="tabpanel">
+                <div class="card card-body text-center">
+                    <p class="h4">Coming Soon!</p>
+                    <p class="text-muted">This feature will allow you to connect with friends from other platforms like GitHub, Google, and more.</p>
+                </div>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="cropImageModal" tabindex="-1" aria-labelledby="cropImageModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="cropImageModalLabel">Update Profile Picture</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <div class="img-container">
+                    <div id="image-placeholder" class="d-flex align-items-center justify-content-center h-100 text-muted">
+                        <p id="drag-drop-text">Click "Choose Image" or drag and drop a file here.</p>
+                        <img id="image-to-crop" src="" style="display:none; max-width: 100%;" onload="document.getElementById('drag-drop-text').style.display = 'none';">
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <input type="file" id="image-input" accept="image/*" class="d-none">
+                <button type="button" class="btn btn-primary" onclick="document.getElementById('image-input').click()">Choose Image</button>
+                <button type="button" class="btn btn-success" id="save-crop-button">Save Changes</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="cropBannerModal" tabindex="-1" aria-labelledby="cropBannerModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="cropBannerModalLabel">Update Banner Image</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <div class="img-container">
+                    <img id="banner-image-to-crop" src="" style="max-width: 100%;">
+                </div>
+            </div>
+            <div class="modal-footer">
+                <input type="file" id="banner-image-input" accept="image/*" class="d-none">
+                <button type="button" class="btn btn-primary" onclick="document.getElementById('banner-image-input').click()">Choose Image</button>
+                <button type="button" class="btn btn-success" id="save-banner-crop-button">Save Changes</button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.2/cropper.min.css" />
+<script src="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.2/cropper.min.js"></script>
+
+<script>
+    document.addEventListener('DOMContentLoaded', function () {
+        const modal = document.getElementById('cropImageModal');
+        const image = document.getElementById('image-to-crop');
+        const imageInput = document.getElementById('image-input');
+        const imgContainer = document.querySelector('.img-container');
+        const placeholder = document.getElementById('image-placeholder');
+        const saveButton = document.getElementById('save-crop-button');
+        const csrfToken = '{{ csrf_token }}';
+        let cropper;
+
+        // Reusable function to handle file processing
+        function handleFile(file) {
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = function (event) {
+                    placeholder.style.display = 'none';
+                    image.style.display = 'block';
+                    image.src = event.target.result;
+
+                    if (cropper) {
+                        cropper.destroy();
+                    }
+                    cropper = new Cropper(image, {
+                        aspectRatio: 1,
+                        viewMode: 1,
+                        background: false,
+                    });
+                };
+                reader.readAsDataURL(file);
+            }
+        }
+
+        // Handle file selection via button
+        imageInput.addEventListener('change', (e) => handleFile(e.target.files[0]));
+
+        // Handle Drag and Drop
+        imgContainer.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            imgContainer.style.backgroundColor = '#e9ecef';
+        });
+        imgContainer.addEventListener('dragleave', () => {
+            imgContainer.style.backgroundColor = '#f7f7f7';
+        });
+        imgContainer.addEventListener('drop', (e) => {
+            e.preventDefault();
+            imgContainer.style.backgroundColor = '#f7f7f7';
+            handleFile(e.dataTransfer.files[0]);
+        });
+        
+        // Save Button Logic
+        saveButton.addEventListener('click', function () {
+            if (!cropper) {
+                return;
+            }
+
+            // Provide user feedback
+            this.disabled = true;
+            this.textContent = 'Saving...';
+
+            cropper.getCroppedCanvas({
+                width: 500,
+                height: 500,
+            }).toBlob((blob) => {
+                const formData = new FormData();
+                formData.append('cropped_image', blob, 'profile.jpg');
+
+                fetch("{% url 'upload-profile-picture' %}", {
+                    method: 'POST',
+                    headers: { 'X-CSRFToken': csrfToken },
+                    body: formData,
+                })
+                .then(response => response.json())
+                .then(data => {
+                    console.log('Server response:', data); // For debugging
+                    if (data.status === 'success') {
+                        document.querySelectorAll('.profile-picture-img-desktop, .card-img-top').forEach(img => {
+                            img.src = data.new_picture_url + '?' + new Date().getTime();
+                        });
+                        bootstrap.Modal.getInstance(modal).hide();
+                    } else {
+                        alert('Error: ' + data.message);
+                    }
+                })
+                .catch(error => {
+                    console.error('Upload failed:', error);
+                    alert('An unexpected error occurred.');
+                })
+                .finally(() => {
+                    // Restore button state
+                    this.disabled = false;
+                    this.textContent = 'Save Changes';
+                });
+            }, 'image/jpeg');
+        });
+
+        // Cleanup on modal close
+        modal.addEventListener('hidden.bs.modal', function () {
+            if (cropper) {
+                cropper.destroy();
+                cropper = null;
+            }
+            image.src = '';
+            image.style.display = 'none';
+            placeholder.style.display = 'flex';
+        });
+    });
+</script>
+
+<script>
+    document.addEventListener('DOMContentLoaded', function () {
+        const bannerModal = document.getElementById('cropBannerModal');
+        const bannerImage = document.getElementById('banner-image-to-crop');
+        const bannerImageInput = document.getElementById('banner-image-input');
+        const bannerSaveButton = document.getElementById('save-banner-crop-button');
+        let bannerCropper;
+
+        bannerImageInput.addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = (event) => {
+                    bannerImage.src = event.target.result;
+                    if (bannerCropper) bannerCropper.destroy();
+                    bannerCropper = new Cropper(bannerImage, {
+                        aspectRatio: 16 / 6, // Use a wide aspect ratio for the banner
+                        viewMode: 1,
+                    });
+                };
+                reader.readAsDataURL(file);
+            }
+        });
+
+        bannerSaveButton.addEventListener('click', function () {
+            if (!bannerCropper) return;
+            this.disabled = true;
+            this.textContent = 'Saving...';
+            bannerCropper.getCroppedCanvas({ width: 1200, height: 450 }).toBlob((blob) => {
+                const formData = new FormData();
+                formData.append('cropped_image', blob, 'banner.jpg');
+                fetch("{% url 'upload-banner-picture' %}", {
+                    method: 'POST',
+                    headers: { 'X-CSRFToken': '{{ csrf_token }}' },
+                    body: formData,
+                })
+                .then(res => res.json())
+                .then(data => {
+                    if (data.status === 'success') {
+                        document.querySelector('.profile-banner-img').src = data.new_banner_url + '?' + new Date().getTime();
+                        bootstrap.Modal.getInstance(bannerModal).hide();
+                    } else {
+                        alert('Error: ' + data.message);
+                    }
+                })
+                .finally(() => {
+                    this.disabled = false;
+                    this.textContent = 'Save Changes';
+                });
+            }, 'image/jpeg');
+        });
+        
+        bannerModal.addEventListener('hidden.bs.modal', () => {
+            if (bannerCropper) {
+                bannerCropper.destroy();
+                bannerCropper = null;
+            }
+            bannerImage.src = '';
+        });
+    });
+</script>
+{% endblock %}

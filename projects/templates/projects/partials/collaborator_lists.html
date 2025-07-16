@@ -1,3 +1,6 @@
+{% load static %}
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css" integrity="sha512-SnH5WK+bZxgPHs44uWIX+LLJAJ9/2PkPKZ5QiAj6Ta86w+fsb2TkcmfRyVX3pBnMFcV7oQPJkl9QevSCWr3W6A==" crossorigin="anonymous" referrerpolicy="no-referrer" />
+
 {% load project_extras %}
 <div class="row">
     {# --- FIX: Adjust column width based on user role --- #}
@@ -19,11 +22,12 @@
                 <li class="list-group-item d-flex justify-content-between align-items-center">
                     <span>
                         {{ membership.user.username }}
+                        {% if membership.is_friend %}
+                            <span title="You are friends with this user"><i class="fas fa-user-friends"></i></span>
+                        {% endif %}
                     </span>
 
                     {% if membership.is_editable %}
-                        {# --- EDITABLE VIEW --- #}
-                        {# This form is shown if the current user has permission to edit this member. #}
                         <form class="d-flex gap-2"
                             hx-post="{% url 'change-role' membership.id %}"
                             hx-target="#management-section" hx-swap="innerHTML">
@@ -72,35 +76,42 @@
         </ul>
     </div>
 
-    {# --- FIX: Only show 'Add New Members' section to owners and admins --- #}
     {% if role in 'owner,admin' %}
     <div class="col-md-6">
-        <h3>Add New Members</h3>
+        <h3>Invite Friends</h3>
         <ul class="list-group">
-            {% for user in potential_collaborators %}
+            {# --- START: FIX for invite/invited logic --- #}
+            {% for friend_data in friends_to_invite %}
                 <li class="list-group-item">
-                     <form   class="d-flex justify-content-between align-items-center"
-                            hx-post="{% url 'add-collaborator' project.id user.id %}"
-                            hx-target="#management-section" hx-swap="innerHTML">
-                        {% csrf_token %}
-                        <span>{{ user.username }}</span>
-                        <div class="d-flex gap-2">
-                            <select name="role" class="form-select form-select-sm">
-                                {% comment %} --- START: FIX FOR ADDING ADMINS --- {% endcomment %}
-                                {% if role == 'owner' %}
-                                    <option value="admin">Admin</option>
-                                {% endif %}
-                                <option value="editor">Editor</option>
-                                <option value="viewer" selected>Viewer</option>
-                                {% comment %} --- END: FIX FOR ADDING ADMINS --- {% endcomment %}
-                            </select>
-                            <button type="submit" class="btn btn-sm btn-success">Add</button>
-                        </div>
-                    </form>
+                    <div class="d-flex justify-content-between align-items-center">
+                        <span>{{ friend_data.user.username }}</span>
+                        
+                        {% if friend_data.invitation %}
+                            {# This friend has a pending invitation #}
+                            <form hx-post="{% url 'cancel-invitation' friend_data.invitation.id %}" hx-target="#management-section" hx-swap="innerHTML">
+                                {% csrf_token %}
+                                <button type="submit" class="btn btn-sm btn-warning">Invited (Cancel)</button>
+                            </form>
+                        {% else %}
+                            {# This friend has not been invited yet #}
+                            <form hx-post="{% url 'send-invitation' project.id friend_data.user.id %}" hx-target="#management-section" hx-swap="innerHTML">
+                                {% csrf_token %}
+                                <div class="d-flex gap-2">
+                                    <select name="role" class="form-select form-select-sm" style="width: 100px;">
+                                        {% if role == 'owner' %}<option value="admin">Admin</option>{% endif %}
+                                        <option value="editor">Editor</option>
+                                        <option value="viewer" selected>Viewer</option>
+                                    </select>
+                                    <button type="submit" class="btn btn-sm btn-success">Invite</button>
+                                </div>
+                            </form>
+                        {% endif %}
+                    </div>
                 </li>
             {% empty %}
-                <li class="list-group-item">No new users to add.</li>
+                <li class="list-group-item">All of your friends are already in the project.</li>
             {% endfor %}
+            {# --- END: FIX --- #}
         </ul>
     </div>
     {% endif %}

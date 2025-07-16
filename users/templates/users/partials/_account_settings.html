@@ -1,0 +1,63 @@
+{% load crispy_forms_tags %}
+
+<!-- Change Password Card -->
+<div class="card mb-4">
+    <div class="card-header"><h4>Change Password</h4></div>
+    <div class="card-body">
+        <form method="POST" action="{% url 'account_change_password' %}">
+            {% csrf_token %}
+            {{ password_change_form|crispy }}
+            <div class="d-grid">
+                <button class="btn btn-primary" type="submit">Change Password</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Manage Email Card -->
+<div class="card">
+    <div class="card-header"><h4>Manage Email Addresses</h4></div>
+    <div class="card-body">
+        {% if user.emailaddress_set.all %}
+            <p>Your current email addresses:</p>
+            <form action="{% url 'account_email' %}" method="post">
+                {% csrf_token %}
+                <ul class="list-group list-group-flush mb-3">
+                    {% for emailaddress in user.emailaddress_set.all %}
+                    <li class="list-group-item d-flex justify-content-between align-items-center">
+                        <div>
+                            <label for="email_radio_{{forloop.counter}}" class="form-check-label">
+                                <input id="email_radio_{{forloop.counter}}" type="radio" name="email" value="{{emailaddress.email}}" {% if emailaddress.primary %}checked="checked"{%endif %} />
+                                {{ emailaddress.email }}
+                            </label>
+                        </div>
+                        <div>
+                            {% if emailaddress.verified %}
+                                <span class="badge bg-success">Verified</span>
+                            {% else %}
+                                <span class="badge bg-warning text-dark">Unverified</span>
+                            {% endif %}
+                            {% if emailaddress.primary %}
+                                <span class="badge bg-primary">Primary</span>
+                            {% endif %}
+                        </div>
+                    </li>
+                    {% endfor %}
+                </ul>
+                <div class="d-flex flex-wrap gap-2">
+                    <button class="btn btn-secondary btn-sm" type="submit" name="action_primary">Make Primary</button>
+                    <button class="btn btn-info btn-sm" type="submit" name="action_send">Re-send Verification</button>
+                    <button class="btn btn-danger btn-sm" type="submit" name="action_remove">Remove</button>
+                </div>
+            </form>
+            <hr>
+        {% endif %}
+        
+        <h5>Add a New Email Address</h5>
+        <form method="post" action="{% url 'account_email' %}">
+            {% csrf_token %}
+            {{ add_email_form|crispy }}
+            <button name="action_add" type="submit" class="btn btn-success mt-2">Add Email</button>
+        </form>
+    </div>
+</div>

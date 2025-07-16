@@ -1,0 +1,22 @@
+{% load crispy_forms_tags %}
+<div class="card">
+    <div class="card-header">
+        <h4>Edit Your Profile</h4>
+    </div>
+    <div class="card-body">
+        <form hx-post="{% url 'edit-profile' %}" hx-target="#profile-details-container" hx-encoding="multipart/form-data">
+            {% csrf_token %}
+            {{ form|crispy }}
+            <div class="d-flex justify-content-end gap-2 mt-3">
+                {# Button to cancel and reload the display view #}
+                <button type="button" class="btn btn-secondary" 
+                        hx-get="{% url 'get-profile-display' public_id=profile.public_id %}" 
+                        hx-target="#profile-details-container" 
+                        hx-swap="innerHTML">
+                    Cancel
+                </button>
+                <button type="submit" class="btn btn-success">Save Changes</button>
+            </div>
+        </form>
+    </div>
+</div>

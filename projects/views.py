@@ -17,8 +17,8 @@ from django.utils import timezone
 from itertools import chain
 from operator import attrgetter
 
-from .models import Project, Task, Comment, User, ProjectMembership, AccessRequest, TaskAssignment, PersonalTodo, Ban, Report, ProjectLog
-from .forms import ProjectForm, TaskForm, CommentForm, ProjectFileForm, ProjectFile
+from .models import Project, Task, Comment, User, ProjectMembership, AccessRequest, TaskAssignment, PersonalTodo, Ban, Report, ProjectLog, ProjectInvitation, PersonalTodo
+from .forms import ProjectForm, TaskForm, CommentForm, ProjectFileForm, ProjectFile, PersonalTodoForm
 from users.models import FriendRequest
 
 def annotate_task_with_states(task, project):
@@ -57,28 +57,49 @@ def get_user_role(project, user):
 def _get_manage_team_context(request, project):
     requesting_user_role = get_user_role(project, request.user)
     
+    friends_ids = {friend.id for friend in request.user.profile.get_friends()}
     memberships = ProjectMembership.objects.filter(project=project).select_related('user')
     for m in memberships:
+        m.is_friend = m.user.id in friends_ids
         m.is_editable = (requesting_user_role == 'owner' or (requesting_user_role == 'admin' and m.role not in ['owner', 'admin']))
         if requesting_user_role == 'owner':
             m.permissible_roles = ProjectMembership.ROLE_CHOICES
         else:
             m.permissible_roles = [r for r in ProjectMembership.ROLE_CHOICES if r[0] != 'admin']
 
-    potential_collaborators = User.objects.none()
+    friends_to_display = []
     if requesting_user_role in ['owner', 'admin']:
-        current_member_ids = [m.user.id for m in memberships] + [project.owner.id]
-        potential_collaborators = User.objects.exclude(id__in=current_member_ids)
+        all_friends = request.user.profile.get_friends()
+        current_member_ids = {m.user.id for m in project.projectmembership_set.all()}
+        current_member_ids.add(project.owner.id)
+        
+        # Get all pending invitations for this project
+        pending_invitations = {inv.invitee.id: inv for inv in project.invitations.filter(status='pending')}
+
+        for friend in all_friends:
+            # Don't show friends who are already in the project
+            if friend.id in current_member_ids:
+                continue
+            
+            # Check if this friend has a pending invitation
+            invitation = pending_invitations.get(friend.id)
+            
+            friends_to_display.append({
+                'user': friend,
+                'invitation': invitation
+            })
 
     banned_list = Ban.objects.filter(project=project).select_related('user')
     for b in banned_list:
-        # --- FIX: Admins can now unban non-admins. Owners can unban anyone. ---
         b.can_unban = (requesting_user_role == 'owner' or (requesting_user_role == 'admin' and b.role != 'admin'))
         
     return {
-        'project': project, 'memberships': memberships,
-        'potential_collaborators': potential_collaborators,
-        'banned_list': banned_list, 'role': requesting_user_role, 'request': request,
+        'project': project,
+        'memberships': memberships,
+        'friends_to_invite': friends_to_display,
+        'banned_list': banned_list,
+        'role': requesting_user_role,
+        'request': request,
     }
     
 @login_required
@@ -118,6 +139,8 @@ def dashboard(request, username):
         key=lambda instance: instance.created_at if hasattr(instance, 'created_at') else instance.uploaded_at,
         reverse=True
     )
+    
+    invitations = ProjectInvitation.objects.filter(invitee=request.user, status='pending')
 
     context = {
         'owned_projects': owned_projects,
@@ -130,18 +153,24 @@ def dashboard(request, username):
         'incoming_requests': incoming_requests_preview,
         'total_friends_count': total_friends_count,
         'total_incoming_requests_count': total_incoming_requests_count,
+        'invitations': invitations,
     }
     return render(request, 'projects/dashboard.html', context)
     
 def index(request):
-    # This view seems to be your project list page
-    # I'll add the necessary logic based on your index.html template
     query = request.GET.get('q')
     active_tab = request.GET.get('tab', 'public')
 
     public_projects = Project.objects.filter(is_public=True)
-    team_projects = Project.objects.filter(collaborators=request.user) if request.user.is_authenticated else Project.objects.none()
-    owned_projects = Project.objects.filter(owner=request.user) if request.user.is_authenticated else Project.objects.none()
+    team_projects = Project.objects.none()
+    owned_projects = Project.objects.none()
+    invitations = ProjectInvitation.objects.none()
+
+    if request.user.is_authenticated:
+        team_projects = Project.objects.filter(collaborators=request.user)
+        owned_projects = Project.objects.filter(owner=request.user)
+        # --- FIX: Fetch invitations for the logged-in user ---
+        invitations = ProjectInvitation.objects.filter(invitee=request.user, status='pending')
 
     if query:
         public_projects = public_projects.filter(Q(title__icontains=query) | Q(description__icontains=query))
@@ -152,6 +181,7 @@ def index(request):
         'public_projects': public_projects,
         'team_projects': team_projects,
         'owned_projects': owned_projects,
+        'invitations': invitations, # Pass invitations to the template
         'active_tab': active_tab,
         'query': query,
     }
@@ -1283,3 +1313,178 @@ def get_comment_main_menu(request, comment_id):
 def get_comment_moderation_menu(request, comment_id):
     context = get_comment_context(request, comment_id)
     return render(request, 'projects/partials/_comment_moderation_menu.html', context)
+
+# projects/views.py
+
+@require_POST
+@login_required
+def send_invitation(request, project_id, user_id):
+    project = get_object_or_404(Project, id=project_id)
+    invitee = get_object_or_404(User, id=user_id)
+    requesting_user_role = get_user_role(project, request.user)
+
+    if requesting_user_role not in ['owner', 'admin']:
+        return HttpResponseForbidden("You do not have permission to invite users.")
+
+    if Ban.objects.filter(project=project, user=invitee).exists():
+        response = render(request, 'projects/partials/_banned_user_modal.html')
+        response['HX-Retarget'] = '#dialog'
+        response['HX-Trigger'] = '{"showModal": "true"}'
+        return response
+
+    role = request.POST.get('role', 'viewer')
+    ProjectInvitation.objects.create(
+        project=project, inviter=request.user, invitee=invitee, role=role
+    )
+    messages.success(request, f"Invitation sent to {invitee.username}.")
+    
+    # --- FIX: Return the entire updated management section ---
+    context = _get_manage_team_context(request, project)
+    return render(request, 'projects/partials/_manage_team_content.html', context)
+
+@require_POST
+@login_required
+def accept_invitation(request, invitation_id):
+    invitation = get_object_or_404(ProjectInvitation, id=invitation_id, invitee=request.user)
+    
+    # Add user to the project
+    ProjectMembership.objects.create(
+        project=invitation.project,
+        user=request.user,
+        role=invitation.role
+    )
+    
+    # Delete the invitation
+    invitation.delete()
+    messages.success(request, f"You have joined the project: {invitation.project.title}.")
+    return redirect(request.META.get('HTTP_REFERER', 'project-list'))
+
+@require_POST
+@login_required
+def decline_invitation(request, invitation_id):
+    invitation = get_object_or_404(ProjectInvitation, id=invitation_id, invitee=request.user)
+    
+    # Delete the invitation
+    invitation.delete()
+    messages.info(request, f"You have declined the invitation to join {invitation.project.title}.")
+    return redirect(request.META.get('HTTP_REFERER', 'project-list'))
+
+@require_POST
+@login_required
+def cancel_invitation(request, invitation_id):
+    invitation = get_object_or_404(ProjectInvitation, id=invitation_id, inviter=request.user)
+    project = invitation.project
+    invitation.delete()
+    messages.info(request, "Invitation has been cancelled.")
+    
+    # --- FIX: Return the entire updated management section ---
+    context = _get_manage_team_context(request, project)
+    return render(request, 'projects/partials/_manage_team_content.html', context)
+
+@login_required
+def personal_todo_list(request):
+    """Renders the initial to-do list component."""
+    todos = PersonalTodo.objects.filter(user=request.user)
+    has_completed = todos.filter(is_completed=True).exists()
+    
+    return render(request, 'projects/partials/_personal_todo_list.html', {
+        'todos': todos,
+        'now': timezone.now(),
+        'has_completed_tasks': has_completed
+    })
+
+@login_required
+def get_add_todo_form(request):
+    """Renders the form for adding a new to-do."""
+    form = PersonalTodoForm()
+    return render(request, 'projects/partials/_add_todo_form.html', {'form': form})
+
+@login_required
+def get_edit_todo_form(request, todo_id):
+    """Renders the form for editing an existing to-do."""
+    todo = get_object_or_404(PersonalTodo, id=todo_id, user=request.user)
+    form = PersonalTodoForm(instance=todo)
+    return render(request, 'projects/partials/_edit_todo_form.html', {'form': form, 'todo': todo})
+
+@require_POST
+@login_required
+def add_personal_todo(request):
+    """Adds a new task and returns multiple partials to update the UI."""
+    form = PersonalTodoForm(request.POST)
+    if form.is_valid():
+        todo = form.save(commit=False)
+        todo.user = request.user
+        todo.save()
+
+    # After saving, re-fetch all data needed for the list content
+    todos = PersonalTodo.objects.filter(user=request.user)
+    has_completed = todos.filter(is_completed=True).exists()
+    
+    context = {
+        'todos': todos,
+        'now': timezone.now(),
+        'has_completed_tasks': has_completed
+    }
+    # --- FIX: Render a special template that contains multiple blocks for swapping ---
+    return render(request, 'projects/partials/_add_todo_response.html', context)
+
+@require_POST
+@login_required
+def edit_personal_todo(request, todo_id):
+    """Handles updating an existing to-do item."""
+    todo = get_object_or_404(PersonalTodo, id=todo_id, user=request.user)
+    form = PersonalTodoForm(request.POST, instance=todo)
+    if form.is_valid():
+        form.save()
+        # After saving, return the updated item display
+        return render(request, 'projects/partials/_personal_todo_item.html', {
+            'todo': todo, 
+            'now': timezone.now()
+        })
+    # If form is invalid, re-render the edit form with errors
+    return render(request, 'projects/partials/_edit_todo_form.html', {'form': form, 'todo': todo})
+
+@require_POST
+@login_required
+def toggle_personal_todo(request, todo_id):
+    """Toggles a task and returns the updated list content to show/hide the 'Clear' button."""
+    todo = get_object_or_404(PersonalTodo, id=todo_id, user=request.user)
+    todo.is_completed = not todo.is_completed
+    todo.save()
+
+    # --- FIX: Return the entire list content block, not just the single item ---
+    todos = PersonalTodo.objects.filter(user=request.user)
+    has_completed = todos.filter(is_completed=True).exists()
+    
+    return render(request, 'projects/partials/_personal_todo_list_content.html', {
+        'todos': todos,
+        'now': timezone.now(),
+        'has_completed_tasks': has_completed
+    })
+
+@require_POST
+@login_required
+def delete_personal_todo(request, todo_id):
+    """Deletes a personal to-do item."""
+    todo = get_object_or_404(PersonalTodo, id=todo_id, user=request.user)
+    todo.delete()
+    # Return an empty response, which HTMX will use to remove the element
+    return HttpResponse(status=200)
+
+@require_POST
+@login_required
+def delete_completed_todos(request):
+    """Finds and deletes all completed to-do items for the current user."""
+    PersonalTodo.objects.filter(user=request.user, is_completed=True).delete()
+    
+    # After deleting, return the refreshed to-do list component
+    todos = PersonalTodo.objects.filter(user=request.user)
+    # We need to check again if there are any completed tasks left (there won't be)
+    # to correctly show/hide the button in the returned partial.
+    has_completed = todos.filter(is_completed=True).exists()
+    
+    return render(request, 'projects/partials/_personal_todo_list_content.html', {
+        'todos': todos,
+        'now': timezone.now(),
+        'has_completed_tasks': has_completed
+    })

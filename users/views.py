@@ -1,10 +1,15 @@
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth.decorators import login_required
+from django.views.decorators.http import require_POST
 from django.contrib.auth.models import User
 from django.db.models import Q
 from django.contrib import messages
 from django.urls import reverse
+from django.http import JsonResponse
 
+from allauth.account.forms import ChangePasswordForm, AddEmailForm
+
+from .forms import ProfileUpdateForm
 from .models import FriendRequest, Profile
 
 @login_required
@@ -159,3 +164,101 @@ def cancel_friend_request(request, request_id):
         return redirect(f"{reverse('manage-friends')}?q={query}&tab=search")
     else: # Default to the pending tab if not search
         return redirect(f"{reverse('manage-friends')}?tab=pending")
+    
+@login_required
+def profile_view(request, public_id):
+    """Displays a user's profile page and handles settings forms."""
+    profile = get_object_or_404(Profile, public_id=public_id)
+    is_own_profile = (request.user == profile.user)
+    
+    context = {
+        'profile': profile,
+        'is_own_profile': is_own_profile,
+    }
+
+    # If the user is viewing their own profile, add the necessary forms to the context
+    if is_own_profile:
+        context['profile_form'] = ProfileUpdateForm(instance=profile)
+        # These forms are from django-allauth
+        context['password_change_form'] = ChangePasswordForm()
+        context['add_email_form'] = AddEmailForm()
+
+    return render(request, 'users/profile.html', context)
+
+@login_required
+def get_profile_display(request, public_id):
+    """Returns the read-only display partial for a profile."""
+    profile = get_object_or_404(Profile, public_id=public_id)
+    return render(request, 'users/partials/_profile_display.html', {'profile': profile})
+
+
+@login_required
+def get_profile_edit_form(request, public_id):
+    """Returns the profile editing form partial."""
+    profile = get_object_or_404(Profile, public_id=public_id)
+    form = ProfileUpdateForm(instance=profile)
+    return render(request, 'users/partials/_profile_edit_form.html', {'profile': profile, 'form': form})
+
+
+@require_POST
+@login_required
+def edit_profile(request):
+    """Handles profile form submission and returns the updated display partial."""
+    profile = request.user.profile
+    form = ProfileUpdateForm(request.POST, request.FILES, instance=profile)
+    
+    if form.is_valid():
+        form.save()
+        messages.success(request, 'Your profile has been updated successfully.')
+        # --- FIX: Return the display partial instead of redirecting ---
+        return render(request, 'users/partials/_profile_display.html', {'profile': profile})
+    
+    # If form is invalid, re-render the edit form with errors
+    return render(request, 'users/partials/_profile_edit_form.html', {'profile': profile, 'form': form})
+
+@require_POST
+@login_required
+def upload_profile_picture(request):
+    """
+    Handles the AJAX request to upload a cropped profile picture.
+    """
+    try:
+        # The file is sent from the frontend
+        cropped_image = request.FILES.get('cropped_image')
+        if not cropped_image:
+            return JsonResponse({'status': 'error', 'message': 'No image file provided.'}, status=400)
+
+        # Get the user's profile and update the picture
+        profile = request.user.profile
+        profile.profile_picture.save(cropped_image.name, cropped_image)
+        
+        # Return a success response with the new image URL
+        return JsonResponse({
+            'status': 'success',
+            'new_picture_url': profile.profile_picture.url
+        })
+
+    except Exception as e:
+        return JsonResponse({'status': 'error', 'message': str(e)}, status=500)
+
+@require_POST
+@login_required
+def upload_banner_picture(request):
+    """
+    Handles the AJAX request to upload a cropped banner picture.
+    """
+    try:
+        cropped_image = request.FILES.get('cropped_image')
+        if not cropped_image:
+            return JsonResponse({'status': 'error', 'message': 'No image file provided.'}, status=400)
+
+        profile = request.user.profile
+        profile.banner_picture.save(cropped_image.name, cropped_image)
+        
+        return JsonResponse({
+            'status': 'success',
+            'new_banner_url': profile.banner_picture.url
+        })
+
+    except Exception as e:
+        return JsonResponse({'status': 'error', 'message': str(e)}, status=500)

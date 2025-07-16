@@ -3,9 +3,9 @@
     <h1 class="mb-4">Welcome back, {{ user.username }}!</h1>
     <div class="row">
         <div class="col-md-8">
-            <div class="card mb-4">
+            <div class="card mb-4" id="personal-todos-card" hx-get="{% url 'personal-todo-list' %}" hx-trigger="load">
                 <div class="card-header">My Personal TODOs</div>
-                <div class="list-group-item">Coming soon...</div>
+                <div class="list-group-item"><em>Loading...</em></div>
             </div>
             
             <div class="card mb-4" id="assignments-card" hx-get="{% url 'dashboard-assignments' %}" hx-trigger="load">
@@ -56,6 +56,82 @@
         <div class="col-md-4">
             {% include 'users/partials/_incoming_requests.html' %}
             {% include 'users/partials/_friends_list.html' %}
+
+            {% if invitations %}
+            <div class="card mb-4">
+                <div class="card-header">
+                    Collaboration Invitations
+                    <span class="badge bg-primary rounded-pill">{{ invitations.count }}</span>
+                </div>
+                <ul class="list-group list-group-flush">
+                    {% for inv in invitations|slice:":5" %}
+                        <li class="list-group-item">
+                            <div>
+                                <strong>{{ inv.project.title }}</strong>
+                                <small class="d-block text-muted">Invited by {{ inv.inviter.username }}</small>
+                            </div>
+                            <div class="d-flex gap-2 mt-2">
+                                <form action="{% url 'accept-invitation' inv.id %}" method="post" class="w-100">
+                                    {% csrf_token %}
+                                    <button type="submit" class="btn btn-sm btn-success w-100">Accept</button>
+                                </form>
+                                <form action="{% url 'decline-invitation' inv.id %}" method="post" class="w-100">
+                                    {% csrf_token %}
+                                    <button type="submit" class="btn btn-sm btn-danger w-100">Decline</button>
+                                </form>
+                            </div>
+                        </li>
+                    {% endfor %}
+                    {% if invitations.count > 5 %}
+                        <a href="#" class="list-group-item list-group-item-action text-center text-primary"
+                        data-bs-toggle="modal" data-bs-target="#all-invitations-modal">
+                            Show all {{ invitations.count }} invitations...
+                        </a>
+                    {% endif %}
+                </ul>
+            </div>
+            {% endif %}
+
+            {% block scripts %}
+                <div class="modal fade" id="all-invitations-modal" tabindex="-1">
+                <div class="modal-dialog modal-dialog-centered">
+                    <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title">All Collaboration Invitations</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                    </div>
+                    <div class="modal-body" style="max-height: 60vh; overflow-y: auto;">
+                        <ul class="list-group list-group-flush">
+                            {% for inv in invitations %}
+                                <li class="list-group-item">
+                                    <div>
+                                        <strong>{{ inv.project.title }}</strong>
+                                        <small class="d-block text-muted">Invited by {{ inv.inviter.username }} to be a(n) {{ inv.get_role_display }}</small>
+                                    </div>
+                                    <div class="d-flex gap-2 mt-2">
+                                        <form action="{% url 'accept-invitation' inv.id %}" method="post" class="w-100">
+                                            {% csrf_token %}
+                                            <button type="submit" class="btn btn-sm btn-success w-100">Accept</button>
+                                        </form>
+                                        <form action="{% url 'decline-invitation' inv.id %}" method="post" class="w-100">
+                                            {% csrf_token %}
+                                            <button type="submit" class="btn btn-sm btn-danger w-100">Decline</button>
+                                        </form>
+                                    </div>
+                                </li>
+                            {% empty %}
+                                <li class="list-group-item">No pending invitations.</li>
+                            {% endfor %}
+                        </ul>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                    </div>
+                    </div>
+                </div>
+                </div>
+            {% endblock %}
+            
             <div class="card mb-4">
                 <div class="card-header">My Projects</div>
                 <div class="list-group list-group-flush">
@@ -71,9 +147,9 @@
             <div class="card">
                 <div class="card-header">Account</div>
                 <div class="list-group list-group-flush">
+                    <a href="{% url 'profile-view' public_id=user.profile.public_id %}" class="list-group-item list-group-item-action">My Profile</a>
                     <a href="{% url 'account_change_password' %}" class="list-group-item list-group-item-action">Change Password</a>
                     <a href="{% url 'account_email' %}" class="list-group-item list-group-item-action">Manage Email</a>
-                    <a href="#" class="list-group-item list-group-item-action disabled">My Profile (coming soon)</a>
                 </div>
             </div>
         </div>

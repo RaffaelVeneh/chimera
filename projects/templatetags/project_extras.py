@@ -1,4 +1,6 @@
 from django import template
+from django.utils.timesince import timesince
+from django.utils import timezone
 from projects.models import ProjectMembership
 
 register = template.Library()
@@ -40,3 +42,14 @@ def has_project_role(user, project):
         return membership.role
     except ProjectMembership.DoesNotExist:
         return None
+    
+@register.filter
+def due_status(due_date):
+    if not due_date:
+        return ""
+    
+    now = timezone.now()
+    if due_date < now:
+        return f"due {timesince(due_date, now)} ago"
+    else:
+        return f"due in {timesince(now, due_date)}"

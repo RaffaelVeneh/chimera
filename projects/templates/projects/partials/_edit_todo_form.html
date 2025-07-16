@@ -1,0 +1,32 @@
+<li class="list-group-item bg-light-subtle" id="todo-item-{{ todo.id }}">
+    <form hx-post="{% url 'edit-personal-todo' todo.id %}" hx-target="#todo-item-{{ todo.id }}" hx-swap="outerHTML">
+        {% csrf_token %}
+        <div class="mb-2">
+            <label for="id_title_edit" class="form-label small">Task Title</label>
+            {{ form.title }}
+        </div>
+        <div class="row">
+            <div class="col-md-8 mb-2">
+                <label for="id_due_date_edit" class="form-label small">Due Date</label>
+                {{ form.due_date }}
+            </div>
+            <div class="col-md-4 mb-2">
+                <label for="id_priority_edit" class="form-label small">Priority</label>
+                {{ form.priority }}
+            </div>
+        </div>
+        <div class="d-flex justify-content-between mt-2">
+            <button type="button" class="btn btn-sm btn-danger" 
+                    hx-post="{% url 'delete-personal-todo' todo.id %}" 
+                    hx-target="#todo-item-{{ todo.id }}" 
+                    hx-swap="outerHTML" 
+                    hx-confirm="Are you sure you want to delete this task?">
+                Delete
+            </button>
+            <div class="d-flex gap-2">
+                <button type="button" class="btn btn-sm btn-secondary" hx-get="{% url 'personal-todo-list' %}" hx-target="#personal-todos-card" hx-swap="innerHTML">Cancel</button>
+                <button type="submit" class="btn btn-sm btn-success">Save Changes</button>
+            </div>
+        </div>
+    </form>
+</li>

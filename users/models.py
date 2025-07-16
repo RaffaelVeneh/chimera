@@ -2,8 +2,6 @@ import uuid
 from django.db import models
 from django.contrib.auth.models import User
 
-# The Friendship model is no longer needed.
-
 class Profile(models.Model):
     """
     A profile model linked to each User.
@@ -15,8 +13,26 @@ class Profile(models.Model):
         editable=False, 
         unique=True
     )
-    # The ManyToManyField is removed. We'll get friends from the FriendRequest model.
-
+    
+    name = models.CharField(max_length=100, blank=True, help_text="Your full name, e.g., Dr. Eva Rostova")
+    headline = models.CharField(max_length=150, blank=True, help_text="A short headline, e.g., Quantum Biologist at Chimera University")
+    bio = models.TextField(blank=True, help_text="A short biography describing your work and research interests.")
+    institution = models.CharField(max_length=150, blank=True, help_text="Your university, company, or institution.")
+    website_url = models.URLField(max_length=200, blank=True, help_text="A link to your personal website, blog, or portfolio.")
+    
+    # For profile pictures, we'll store them in a 'profile_pics' directory inside your media folder.
+    profile_picture = models.ImageField(default='profile_pics/default.jpg', upload_to='profile_pics')
+    banner_picture = models.ImageField(default='banner_pics/default.jpg', upload_to='banner_pics')
+    
+    research_interests = models.TextField(
+        blank=True, 
+        help_text="Comma-separated list of your research interests (e.g., Quantum Computing, Machine Learning)."
+    )
+    skills = models.TextField(
+        blank=True, 
+        help_text="Comma-separated list of your skills (e.g., Python, Data Analysis, R)."
+    )
+    
     def __str__(self):
         return f'{self.user.username} Profile'
 

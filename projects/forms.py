@@ -1,6 +1,6 @@
 from django import forms
 from django.contrib.auth.models import User
-from .models import Project, Task, Comment, ProjectFile
+from .models import Project, Task, Comment, ProjectFile, PersonalTodo
 
 class ProjectForm(forms.ModelForm):
     class Meta:
@@ -37,3 +37,20 @@ class ProjectFileForm(forms.ModelForm):
     class Meta:
         model = ProjectFile
         fields = ['description', 'file']
+        
+class PersonalTodoForm(forms.ModelForm):
+    # Use a specific input format for the datetime field
+    due_date = forms.DateTimeField(
+        widget=forms.DateTimeInput(
+            attrs={'type': 'datetime-local', 'class': 'form-control'}
+        ),
+        required=False
+    )
+
+    class Meta:
+        model = PersonalTodo
+        fields = ['title', 'due_date', 'priority']
+        widgets = {
+            'title': forms.TextInput(attrs={'class': 'form-control'}),
+            'priority': forms.Select(attrs={'class': 'form-select'}),
+        }
